@@ -17,7 +17,7 @@ namespace SDL_Demo.Mapping;
 /// Discrete (edge-detected on the frame's monotonic counters, never on the one-tick bools — see
 /// <see cref="AudioFrame.OnsetCount"/>):
 ///   - beat (bass-only onset): fires a decaying zoom punch, and — held for a minimum time —
-///     picks a new curated Julia-`c` waypoint with a fast ease-out glide;
+///     glides to the next curated Julia-`c` waypoint along a loop of neighbouring points;
 ///   - general onset: advances the palette, held for a minimum time and crossfaded, never snapped.
 ///
 /// Julia-`c` mapping: a curated-waypoint approach (see PLAN.md "Julia mapping") rather than
@@ -28,23 +28,32 @@ namespace SDL_Demo.Mapping;
 /// </summary>
 public sealed class AudioToFractalMapper
 {
-    // Curated Julia constants near the Mandelbrot boundary — hand-picked for visual interest,
-    // not derived from audio. Exact set is a judgment call per PLAN.md; tune by eye later.
+    // Curated Julia constants near the Mandelbrot boundary, ordered as a loop around it (upper
+    // half, then the mirrored lower half — conj(c) gives the mirror-image set) so consecutive
+    // waypoints are neighbours. The original unordered list made most glides cut straight across
+    // the main cardioid, where every midpoint is a fat solid blob: each beat inflated and
+    // deflated the silhouette (verified on a rendered contact sheet, playtest 3).
     private static readonly (float X, float Y)[] Waypoints =
     {
-        (-0.8f, 0.156f),
-        (-0.70176f, -0.3842f),
         (0.285f, 0.01f),
-        (-0.4f, 0.6f),
-        (-0.835f, -0.2321f),
-        (-0.74543f, 0.11301f),
-        (0.279f, 0.0f),
+        (0.36f, 0.216f),
+        (0.235f, 0.485f),
         (-0.1f, 0.651f),
+        (-0.4f, 0.6f),
+        (-0.74543f, 0.11301f),
+        (-0.8f, 0.156f),
+        (-0.835f, -0.2321f),
+        (-0.74543f, -0.11301f),
+        (-0.70176f, -0.3842f),
+        (-0.4f, -0.6f),
+        (-0.1f, -0.651f),
+        (0.235f, -0.485f),
+        (0.36f, -0.216f),
     };
 
     // Phase 9 starting values (PLAN.md) — all tune-by-eye, not derived.
     private const float PerturbRadius = 0.12f;         // continuous `c` perturbation bound (was 0.05 — too small to read as shape change).
-    private const float GlideSeconds = 0.35f;          // beat-triggered waypoint glide; ease-out so it lands on the beat.
+    private const float GlideSeconds = 0.9f;           // beat-triggered waypoint glide; ease-out, so motion starts on the beat.
     private const float MinWaypointHoldSeconds = 1.5f; // beats inside this window punch the zoom but don't change shape.
     private const float PaletteRotationSpeed = 0.6f;   // palette-phase units/sec at Rms == 1.
     private const float PaletteFadeSeconds = 1.5f;     // palette crossfade duration.
@@ -56,9 +65,18 @@ public sealed class AudioToFractalMapper
     private const float ZoomRestScale = 0.75f;
     private const float ZoomBreathDepth = 0.2f;
     private const float ZoomBeatPunch = 0.05f;
-    private const float BeatPulseDecaySeconds = 0.18f; // e-folding time of the per-beat pulse.
-    private const float FitZoomOutSeconds = 0.05f;     // shape grew: follow almost at once so it never crosses the border.
-    private const float FitZoomInSeconds = 0.6f;       // shape shrank: ease in, so the frame doesn't jitter.
+    private const float BeatPulseAttackSeconds = 0.04f; // pulse rises over a few frames rather than a one-frame step.
+    private const float BeatPulseDecaySeconds = 0.25f;  // e-folding time of the per-beat pulse.
+    private const float FitZoomOutSeconds = 0.15f;     // shape grew: follow quickly (the border absorbs the lag).
+    private const float FitZoomInSeconds = 0.8f;       // shape shrank: ease in, so the frame doesn't jitter.
+
+    // Smoothing on the audio features that steer the shape. The analyzer's envelopes attack in
+    // ~10ms and the spectral centroid is raw per-tick, which made `c` and the zoom twitch on
+    // every sound (playtest 3: "disjointed, not smooth").
+    private const float ShapeSmoothingSeconds = 0.5f;    // centroid / band tilt -> perturbation angle.
+    private const float RadiusSmoothingSeconds = 0.2f;   // bass -> perturbation radius.
+    private const float ZoomBassAttackSeconds = 0.08f;   // bass -> zoom breathing.
+    private const float ZoomBassReleaseSeconds = 0.5f;
     private const float MinFitZoom = 0.3f;
     private const float MaxFitZoom = 3.0f;
     private const float BandAgcDecaySeconds = 5.0f;    // per-band running-max decay for normalisation.
@@ -90,7 +108,13 @@ public sealed class AudioToFractalMapper
 
     private double _waypointChangeSeconds = -MinWaypointHoldSeconds;
     private float _beatPulse;
+    private float _beatPulseTarget;
     private float _fitZoom = 1f;
+
+    private float _smoothCentroid;
+    private float _smoothTilt;
+    private float _smoothRadiusBass;
+    private float _smoothZoomBass;
 
     private int _paletteFrom;
     private int _paletteTo;
@@ -123,12 +147,12 @@ public sealed class AudioToFractalMapper
 
         if (beat)
         {
-            _beatPulse = 1f;
+            _beatPulseTarget = 1f;
 
             if (nowSeconds - _waypointChangeSeconds >= MinWaypointHoldSeconds)
             {
                 _glideFromC = _baseC;
-                _targetWaypointIndex = PickNextWaypointIndex(frame);
+                _targetWaypointIndex = (_targetWaypointIndex + 1) % Waypoints.Length;
                 _glideStartSeconds = nowSeconds;
                 _waypointChangeSeconds = nowSeconds;
             }
@@ -153,19 +177,27 @@ public sealed class AudioToFractalMapper
         }
         float bass = (bands[0] + bands[1]) * 0.5f;
 
-        // --- Glide the base waypoint toward the target: ease-out, fast start, so it lands on the
-        // beat rather than drifting toward it. ---
+        _smoothCentroid = Smooth(_smoothCentroid, frame.SpectralCentroid01, ShapeSmoothingSeconds, dtF);
+        _smoothTilt = Smooth(_smoothTilt, bands[2] - bands[5], ShapeSmoothingSeconds, dtF);
+        _smoothRadiusBass = Smooth(_smoothRadiusBass, bass, RadiusSmoothingSeconds, dtF);
+        _smoothZoomBass = Smooth(
+            _smoothZoomBass, bass, bass > _smoothZoomBass ? ZoomBassAttackSeconds : ZoomBassReleaseSeconds, dtF);
+
+        // --- Glide the base waypoint toward the target. Smoothstep (zero velocity at both ends)
+        // rather than ease-out: the beat itself is marked by the zoom pulse, so the shape can
+        // morph without a kink at the start. ---
         (float targetBaseX, float targetBaseY) = Waypoints[_targetWaypointIndex];
         float glideT = _glideStartSeconds < 0
             ? 1f
             : (float)Math.Clamp((nowSeconds - _glideStartSeconds) / GlideSeconds, 0.0, 1.0);
-        float easedT = EaseOutCubic(glideT);
+        float easedT = SmoothStep(glideT);
         _baseC = (Lerp(_glideFromC.X, targetBaseX, easedT), Lerp(_glideFromC.Y, targetBaseY, easedT));
 
         // --- Continuous: bass -> perturbation radius; centroid plus a low-mid vs presence tilt
-        // -> angle, so the boundary morphs with the mix and not only with brightness. ---
-        float angle = (frame.SpectralCentroid01 * MathF.PI * 2f) + (MathF.PI * (bands[2] - bands[5]));
-        float radius = bass * PerturbRadius;
+        // -> angle, so the boundary morphs with the mix and not only with brightness. All three
+        // inputs are smoothed above. ---
+        float angle = (_smoothCentroid * MathF.PI * 2f) + (MathF.PI * _smoothTilt);
+        float radius = _smoothRadiusBass * PerturbRadius;
 
         // Rate-limit only the perturbation (not the beat glide) so a loud transient can't jerk
         // `c` within a single frame.
@@ -201,9 +233,12 @@ public sealed class AudioToFractalMapper
 
         // --- Zoom breathes with bass (plus the decaying beat punch) below the fit zoom —
         // bounded, so the silhouette grows toward the border on loud passages but never past it. ---
-        _beatPulse *= MathF.Exp(-dtF / BeatPulseDecaySeconds);
+        // The pulse chases a target that a beat sets to 1 and that then decays, so it rises over
+        // a few frames instead of stepping, and never exceeds 1.
+        _beatPulseTarget *= MathF.Exp(-dtF / BeatPulseDecaySeconds);
+        _beatPulse = Smooth(_beatPulse, _beatPulseTarget, BeatPulseAttackSeconds, dtF);
         float zoom = Math.Clamp(
-            _fitZoom * (ZoomRestScale + (ZoomBreathDepth * bass) + (ZoomBeatPunch * _beatPulse)), MinZoom, MaxZoom);
+            _fitZoom * (ZoomRestScale + (ZoomBreathDepth * _smoothZoomBass) + (ZoomBeatPunch * _beatPulse)), MinZoom, MaxZoom);
 
         int maxIter = Math.Clamp(MaxIter, MinMaxIter, MaxMaxIterClamp);
 
@@ -218,25 +253,12 @@ public sealed class AudioToFractalMapper
         program.SetUniform1f("u_paletteBlend", paletteBlend);
     }
 
-    private int PickNextWaypointIndex(AudioFrame frame)
-    {
-        // Audio-feature-biased pick: higher spectral centroid nudges toward "spikier" waypoints
-        // further along the curated list; otherwise just advance sequentially. Tune by eye later.
-        int sequential = (_targetWaypointIndex + 1) % Waypoints.Length;
-        if (frame.SpectralCentroid01 > 0.75f)
-        {
-            return (sequential + 1) % Waypoints.Length;
-        }
-        return sequential;
-    }
-
     private static float SmoothStep(float t) => t * t * (3f - (2f * t));
 
-    private static float EaseOutCubic(float t)
-    {
-        float u = 1f - t;
-        return 1f - (u * u * u);
-    }
+    /// <summary>Frame-rate-independent one-pole low-pass: moves <paramref name="current"/>
+    /// toward <paramref name="target"/> with time constant <paramref name="tauSeconds"/>.</summary>
+    private static float Smooth(float current, float target, float tauSeconds, float dtSeconds) =>
+        Lerp(current, target, 1f - MathF.Exp(-dtSeconds / tauSeconds));
 
     private static float Lerp(float a, float b, float t) => a + ((b - a) * t);
 

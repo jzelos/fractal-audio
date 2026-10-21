@@ -613,3 +613,12 @@ parametric curve". Concretely, for Tier 1:
   grid each frame and the mapper zooms to at most that fit minus a 10% border (fit follows fast
   when the shape grows, slowly when it shrinks). Verified: 25s run against the same track — clean,
   ~1.9 beats/s (was ~2.4), no exceptions. Framing not visually verified.
+- 2026-10-21 [worker] Phase 9 playtest 3: silhouette motion "disjointed, not smooth"; beat
+  still not right. Smoothness fix (this entry): waypoints re-ordered into a loop around the
+  Mandelbrot boundary (with mirrored conj(c) points, 14 total) — a CPU-rendered contact sheet
+  showed the old order's glide midpoints were nearly all fat cardioid-interior blobs, so every
+  change inflated/deflated the shape; the loop's midpoints resemble their neighbours. Glide 0.9s
+  smoothstep (was 0.35s ease-out); centroid-skip removed (sequential only). Shape inputs smoothed
+  in the mapper (centroid/tilt 0.5s, radius-bass 0.2s, zoom-bass 80ms/500ms asymmetric — the raw
+  centroid jumps ~0.4 tick-to-tick); beat pulse rises over ~40ms instead of a one-frame step;
+  fit-zoom taus 0.15s/0.8s; `JuliaBounds` grid 128x64. 10s smoke run: clean, 16.7ms frames.

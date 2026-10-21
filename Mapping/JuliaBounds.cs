@@ -14,8 +14,8 @@ namespace SDL_Demo.Mapping;
 public static class JuliaBounds
 {
     private const float Extent = 2.0f;   // the filled Julia set always lies within |z| <= 2.
-    private const int GridX = 96;
-    private const int GridY = 48;        // upper half-plane only, by symmetry.
+    private const int GridX = 128;       // ~0.03 cell; coarser grids made the fit zoom visibly step.
+    private const int GridY = 64;        // upper half-plane only, by symmetry.
     private const int TestIter = 48;
 
     /// <summary>Returns (maxAbsX, maxAbsY) of the sampled set, or null if nothing stayed bounded.</summary>
