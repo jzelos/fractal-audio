@@ -41,6 +41,15 @@ public sealed class AudioAnalyzer : IDisposable
     // offline prototype) plus about a frame of display latency.
     private const float BeatLeadSeconds = 0.05f;
 
+    // Tempo tracker input: full-band log-compressed flux plus half-weighted bass flux, each
+    // normalised by its own running mean. Bass alone failed on "Catch" (Kosheen, 130 BPM): its
+    // sustained bass line has ~no periodicity at the beat (ACF 0.07) while full-band log flux
+    // peaks exactly at 130 (0.57). Full-band alone failed the bass-carried "Papua New Guinea".
+    // 0.5 was the only weight good on both recordings offline.
+    private const float OnsetLogScale = 1000f;          // log1p(scale * magnitude) compression.
+    private const float TempoBassWeight = 0.5f;
+    private const double OnsetMeanSeconds = 10.0;       // running-mean time constant for normalisation.
+
     private readonly AudioCapture _capture;
     private readonly AudioFrameBus _bus;
     private readonly Stopwatch _clock = new();
@@ -56,6 +65,10 @@ public sealed class AudioAnalyzer : IDisposable
     private readonly float[] _sampleWindow = new float[FftSize];
     private readonly Complex[] _fftBuffer = new Complex[FftSize];
     private readonly float[] _magnitudes = new float[FftSize / 2];
+    private readonly float[] _previousLogMagnitudes = new float[FftSize / 2];
+    private float _fullFluxMean;
+    private float _bassFluxMean;
+    private int _onsetMeanTicks;
 
     private int[] _bandBinStart = new int[BandCount];
     private int[] _bandBinEnd = new int[BandCount];
@@ -206,7 +219,7 @@ public sealed class AudioAnalyzer : IDisposable
         int beatStart = _bandBinStart[BeatBandFirst];
         int beatEnd = _bandBinEnd[BeatBandLast];
         (_, bool rawBeat) = _beatDetector.Process(_magnitudes.AsSpan(beatStart, beatEnd - beatStart));
-        bool gridBeat = _tempo.Process(_beatDetector.RawFlux);
+        bool gridBeat = _tempo.Process(TempoOnsetStrength(_beatDetector.RawFlux));
         bool beatDetected = _tempo.Locked ? gridBeat : rawBeat;
 
         if (onsetDetected)
@@ -249,6 +262,36 @@ public sealed class AudioAnalyzer : IDisposable
         _bus.Publish(frame);
 
         MaybeLogToConsole(frame);
+    }
+
+    /// <summary>Onset-strength sample for <see cref="TempoTracker"/>: full-band (sub-bass to air)
+    /// log-compressed spectral flux, plus <see cref="TempoBassWeight"/> x the bass-band flux, each
+    /// divided by its running mean so neither dominates by scale.</summary>
+    private float TempoOnsetStrength(float bassFlux)
+    {
+        int start = _bandBinStart[0];
+        int end = _bandBinEnd[BandCount - 1];
+        float fullFlux = 0f;
+        for (int i = start; i < end; i++)
+        {
+            float logMag = MathF.Log(1f + (OnsetLogScale * _magnitudes[i]));
+            float delta = logMag - _previousLogMagnitudes[i];
+            if (delta > 0f)
+            {
+                fullFlux += delta;
+            }
+            _previousLogMagnitudes[i] = logMag;
+        }
+
+        // Cumulative average until enough ticks have passed, then the fixed time constant — so the
+        // means are right from the first tick rather than ramping up from zero.
+        _onsetMeanTicks++;
+        float alpha = Math.Max((float)(TickIntervalSeconds / OnsetMeanSeconds), 1f / _onsetMeanTicks);
+        _fullFluxMean += alpha * (fullFlux - _fullFluxMean);
+        _bassFluxMean += alpha * (bassFlux - _bassFluxMean);
+
+        return (fullFlux / Math.Max(_fullFluxMean, 1e-6f))
+            + (TempoBassWeight * bassFlux / Math.Max(_bassFluxMean, 1e-9f));
     }
 
     private void EnsureBandBinsFor(int sampleRate)

@@ -652,3 +652,13 @@ parametric curve". Concretely, for Tier 1:
   kept the stale zoom. TestIter 48 -> 16: dust now gets a real extent (fit 0.78, rendered inside
   the 10% border), connected sets unchanged (checked offline). Re-screenshot: silhouette within
   the border.
+- 2026-10-21 [worker] Tempo test against a known-BPM track, "Catch" (Kosheen, 130 BPM): tracker
+  wandered 52/74/90/57. Offline on a 45s dump (temporary, not committed): bass flux has ~no
+  periodicity at 130 (ACF 0.07 — sustained bass line); every higher band peaks exactly at 130,
+  full-band log flux strongest (0.57). Tick timing ruled out (18-22ms, resampling changes
+  nothing). Tracker input is now full-band log flux + 0.5 x bass flux, each mean-normalised (0.5
+  the only weight good on both this and the PNG dump). Live, it then held ~130 for 30s and
+  flipped to a syncopated 91 BPM that out-scored it for 2s, so added score hysteresis (keep the
+  current tempo while its prior-weighted ACF >= 0.8 x best). Final live run, 75s: locked at 130
+  within 5s; all 122 readings after 12s in 129.5-131.5 BPM; overlay screenshot shows 130.3 LOCKED.
+  PNG re-checked only offline (on a 64-bin dump), not live.

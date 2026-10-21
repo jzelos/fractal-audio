@@ -3,7 +3,7 @@ namespace SDL_Demo.Audio;
 /// <summary>
 /// Tempo estimate + phase-locked beat clock (IDEAS.md Tier 2 "tempo estimate + beat-phase-locked
 /// LFOs", pulled forward by the Phase 9 playtests). Fed one onset-strength sample per analyzer
-/// tick (bass-band spectral flux); emits a perfectly regular grid beat once locked, instead of
+/// tick (see AudioAnalyzer.TempoOnsetStrength); emits a perfectly regular grid beat once locked, instead of
 /// the raw detector's per-hit pulses, which fire on off-beat bass hits and jitter by ±20%.
 ///
 /// Every <see cref="EstimateEveryTicks"/> ticks, over the last <see cref="HistoryTicks"/>:
@@ -16,9 +16,9 @@ namespace SDL_Demo.Audio;
 ///      of more than a quarter cycle are ignored unless they persist.
 /// A different tempo (including an octave error) is only adopted once it persists too.
 ///
-/// Prototyped and tuned offline against a live dump of "Papua New Guinea" (FSOL): locks within
-/// the first window at ~61.3 BPM, grid beats within ±40ms of the accented kick. Constants are
-/// starting points from that one track, not universal.
+/// Prototyped and tuned offline against live dumps of two tracks: "Papua New Guinea" (FSOL),
+/// locking at ~61.3 BPM with beats within ±40ms of the accented kick, and "Catch" (Kosheen,
+/// known 130 BPM), locking at ~130 BPM. Constants are starting points, not universal.
 /// </summary>
 public sealed class TempoTracker
 {
@@ -38,6 +38,10 @@ public sealed class TempoTracker
     private const float PeriodSmoothing = 0.3f;
     private const float TempoChangeTolerance = 0.06f;
     private const int TempoChangePersist = 4;      // 2s of agreeing estimates before switching tempo.
+    // Keep the current tempo while its prior-weighted ACF is at least this fraction of the best
+    // lag's. Without it, "Catch" (130 BPM) dropped to a syncopated 91 BPM after 30s locked,
+    // because that rival out-scored the beat for just 2s in one passage.
+    private const float TempoStickiness = 0.8f;
     private const float PhaseGain = 0.3f;
     private const float MaxPhaseCorrection = 0.05f; // cycles per estimate.
     private const float BigPhaseError = 0.25f;
@@ -50,6 +54,8 @@ public sealed class TempoTracker
     private readonly float[] _fold = new float[FoldBins];
     private readonly int[] _foldCount = new int[FoldBins];
     private readonly List<float> _pendingPeriods = new();
+    private readonly float[] _lagAc = new float[HistoryTicks];
+    private readonly float[] _lagScore = new float[HistoryTicks];
     private int _written;
     private int _ticksSinceEstimate;
     private int _windowLength;   // valid samples in _window for the current estimate.
@@ -144,7 +150,6 @@ public sealed class TempoTracker
         int maxLag = (int)(60f * _tickRate / MinBpm);
         int bestLag = minLag;
         float bestScore = float.MinValue;
-        float bestAc = 0f;
         for (int lag = minLag; lag <= maxLag; lag++)
         {
             float ac = 0f;
@@ -153,16 +158,25 @@ public sealed class TempoTracker
                 ac += (_window[i] - mean) * (_window[i + lag] - mean);
             }
             ac /= energy;
+            _lagAc[lag] = ac;
 
             float octaves = MathF.Log2(60f * _tickRate / lag / PriorBpm) / PriorOctaves;
-            float score = ac * MathF.Exp(-0.5f * octaves * octaves);
-            if (score > bestScore)
+            _lagScore[lag] = ac * MathF.Exp(-0.5f * octaves * octaves);
+            if (_lagScore[lag] > bestScore)
             {
-                bestScore = score;
+                bestScore = _lagScore[lag];
                 bestLag = lag;
-                bestAc = ac;
             }
         }
+
+        // Hysteresis: stay on the current tempo unless a rival clearly beats it.
+        int currentLag = (int)MathF.Round(_period);
+        if (_period > 0f && currentLag >= minLag && currentLag <= maxLag
+            && _lagScore[currentLag] >= TempoStickiness * bestScore)
+        {
+            bestLag = currentLag;
+        }
+        float bestAc = _lagAc[bestLag];
 
         // 2. Refine to a fractional period by fold sharpness.
         float estimate = bestLag;
