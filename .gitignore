@@ -1,0 +1,20 @@
+# Build output
+bin/
+obj/
+buildout/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+
+# IDEs
+.vs/
+.vscode/
+.idea/
+
+# Claude Code machine-local settings
+.claude/settings.local.json
+
+# OS
+Thumbs.db
+.DS_Store
