@@ -16,7 +16,8 @@ namespace SDL_Demo.Mapping;
 /// keeps the silhouette inside a fixed screen border (see <see cref="JuliaBounds"/>).
 /// Discrete (edge-detected on the frame's monotonic counters, never on the one-tick bools — see
 /// <see cref="AudioFrame.OnsetCount"/>):
-///   - beat (bass-only onset): fires a decaying zoom punch, and — held for a minimum time —
+///   - beat (the tempo tracker's phase-locked grid beat, or the raw bass-only onset detector
+///     while unlocked): fires a decaying zoom punch, and — every N beats / a minimum hold —
 ///     glides to the next curated Julia-`c` waypoint along a loop of neighbouring points;
 ///   - general onset: advances the palette, held for a minimum time and crossfaded, never snapped.
 ///
@@ -107,6 +108,7 @@ public sealed class AudioToFractalMapper
     private float _perturbY;
 
     private double _waypointChangeSeconds = -MinWaypointHoldSeconds;
+    private int _beatsSinceWaypoint;
     private float _beatPulse;
     private float _beatPulseTarget;
     private float _fitZoom = 1f;
@@ -148,9 +150,18 @@ public sealed class AudioToFractalMapper
         if (beat)
         {
             _beatPulseTarget = 1f;
+            _beatsSinceWaypoint++;
 
-            if (nowSeconds - _waypointChangeSeconds >= MinWaypointHoldSeconds)
+            // Locked to a tempo: change shape every N grid beats, N the smallest power of two
+            // spanning the hold time, so changes fall on the musical grid. Unlocked (raw kick
+            // detector fallback): a plain time hold.
+            bool due = frame.TempoLocked && frame.TempoBpm > 0f
+                ? _beatsSinceWaypoint >= BeatsPerWaypoint(frame.TempoBpm)
+                : nowSeconds - _waypointChangeSeconds >= MinWaypointHoldSeconds;
+
+            if (due)
             {
+                _beatsSinceWaypoint = 0;
                 _glideFromC = _baseC;
                 _targetWaypointIndex = (_targetWaypointIndex + 1) % Waypoints.Length;
                 _glideStartSeconds = nowSeconds;
@@ -251,6 +262,17 @@ public sealed class AudioToFractalMapper
         program.SetUniform1i("u_paletteFrom", _paletteFrom);
         program.SetUniform1i("u_paletteTo", _paletteTo);
         program.SetUniform1f("u_paletteBlend", paletteBlend);
+    }
+
+    private static int BeatsPerWaypoint(float bpm)
+    {
+        float beatSeconds = 60f / bpm;
+        int n = 1;
+        while (n < 16 && n * beatSeconds < MinWaypointHoldSeconds)
+        {
+            n *= 2;
+        }
+        return n;
     }
 
     private static float SmoothStep(float t) => t * t * (3f - (2f * t));

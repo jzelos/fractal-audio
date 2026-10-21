@@ -35,6 +35,10 @@ public sealed class OnsetDetector
     /// normalized flux (roughly 0..1, saturating above the onset threshold — for shader/display
     /// use, not a physical unit) and whether an onset was detected on this tick.
     /// </summary>
+    /// <summary>Un-normalised flux from the last <see cref="Process"/> call — the onset-strength
+    /// signal <see cref="TempoTracker"/> correlates over.</summary>
+    public float RawFlux { get; private set; }
+
     public (float NormalizedFlux, bool OnsetDetected) Process(ReadOnlySpan<float> magnitudes)
     {
         float rawFlux = 0f;
@@ -50,6 +54,8 @@ public sealed class OnsetDetector
                 }
             }
         }
+
+        RawFlux = rawFlux;
 
         if (_previousMagnitudes == null || _previousMagnitudes.Length != magnitudes.Length)
         {

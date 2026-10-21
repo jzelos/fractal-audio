@@ -622,3 +622,17 @@ parametric curve". Concretely, for Tier 1:
   in the mapper (centroid/tilt 0.5s, radius-bass 0.2s, zoom-bass 80ms/500ms asymmetric — the raw
   centroid jumps ~0.4 tick-to-tick); beat pulse rises over ~40ms instead of a one-frame step;
   fit-zoom taus 0.15s/0.8s; `JuliaBounds` grid 128x64. 10s smoke run: clean, 16.7ms frames.
+- 2026-10-21 [worker] Phase 9 playtest 3, beat fix: pulled IDEAS.md Tier 2 "tempo estimate +
+  beat-phase-locked" forward as `Audio/TempoTracker.cs`. Grounded in a 40s live dump of the
+  track (temporary, not committed) analysed offline: strongest periodicity ~61.3 BPM (0.979s,
+  found by fold sharpness — integer-lag ACF said 62.5, ~2% off, enough to drift the phase), with
+  two near-equal kicks per cycle; the raw detector fired at ~119 BPM with intervals 0.40-0.75s.
+  Tracker: ACF + weak log-tempo prior -> fractional refine by fold sharpness -> clamped PLL on
+  the fold peak, ignoring isolated half-cycle flips; tempo changes/octave errors need 2s to
+  persist; lock/unlock hysteresis; 4s warm-up; beats fire 50ms early for analysis + display
+  latency. Prototype on the dump: grid locked at 61.3 BPM, intervals 0.96-1.0s (one displaced
+  beat in 32), beats within ±40ms of the accented kick. `AudioFrame` gains `TempoLocked`/
+  `TempoBpm`/`BeatPhase`; `BeatDetected`/`BeatCount` are grid beats while locked, raw kicks as
+  fallback. Mapper changes shape every N locked beats (N = smallest power of 2 spanning 1.5s).
+  Live C# runs locked at ~80 BPM (steady 0.75s grid) and ~109 BPM in later sections of the
+  playback — whether those are the musically "right" beat is NOT verified (needs ears).

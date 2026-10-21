@@ -37,6 +37,10 @@ public sealed class AudioAnalyzer : IDisposable
     private const float BeatThresholdMultiplier = 2.0f;
     private const int BeatRefractoryTicks = 20;        // ~400ms at 50Hz, i.e. caps at ~150 BPM.
 
+    // Grid beats fire this early to cover the analysis window (~20-40ms behind the kick, per the
+    // offline prototype) plus about a frame of display latency.
+    private const float BeatLeadSeconds = 0.05f;
+
     private readonly AudioCapture _capture;
     private readonly AudioFrameBus _bus;
     private readonly Stopwatch _clock = new();
@@ -44,6 +48,7 @@ public sealed class AudioAnalyzer : IDisposable
     private readonly EnvelopeFollower[] _envelopeFollowers;
     private readonly OnsetDetector _onsetDetector = new();
     private readonly OnsetDetector _beatDetector = new(BeatHistoryTicks, BeatThresholdMultiplier, BeatRefractoryTicks);
+    private readonly TempoTracker _tempo = new((float)(1.0 / TickIntervalSeconds), BeatLeadSeconds);
     private long _onsetCount;
     private long _beatCount;
 
@@ -199,7 +204,9 @@ public sealed class AudioAnalyzer : IDisposable
 
         int beatStart = _bandBinStart[BeatBandFirst];
         int beatEnd = _bandBinEnd[BeatBandLast];
-        (_, bool beatDetected) = _beatDetector.Process(_magnitudes.AsSpan(beatStart, beatEnd - beatStart));
+        (_, bool rawBeat) = _beatDetector.Process(_magnitudes.AsSpan(beatStart, beatEnd - beatStart));
+        bool gridBeat = _tempo.Process(_beatDetector.RawFlux);
+        bool beatDetected = _tempo.Locked ? gridBeat : rawBeat;
 
         if (onsetDetected)
         {
@@ -225,6 +232,9 @@ public sealed class AudioAnalyzer : IDisposable
             BeatDetected = beatDetected,
             OnsetCount = _onsetCount,
             BeatCount = _beatCount,
+            TempoLocked = _tempo.Locked,
+            TempoBpm = _tempo.Bpm,
+            BeatPhase = _tempo.Phase,
             BandEnergies = bandEnergies.MoveToImmutable(),
             BandEnergiesRaw = bandEnergiesRaw.MoveToImmutable(),
         };
@@ -271,7 +281,8 @@ public sealed class AudioAnalyzer : IDisposable
         string bands = string.Join(", ", frame.BandEnergies.Select(v => v.ToString("F4")));
         Console.WriteLine(
             $"[AudioAnalyzer] status={frame.Status} rms={frame.Rms:F4} centroid01={frame.SpectralCentroid01:F3} " +
-            $"flux={frame.Flux:F3} onsets={frame.OnsetCount} beats={frame.BeatCount} bands=[{bands}]");
+            $"flux={frame.Flux:F3} onsets={frame.OnsetCount} beats={frame.BeatCount} " +
+            $"tempo={frame.TempoBpm:F1}bpm locked={frame.TempoLocked} conf={_tempo.Confidence:F2} bands=[{bands}]");
     }
 
     public void Dispose()
