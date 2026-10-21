@@ -264,6 +264,21 @@ writer of fractal uniforms and the continuous/discrete split still lives only th
 **Test:** with music: silhouette changes shape and no longer grows unboundedly; palette changes
 fade rather than snap; waypoint jumps and zoom punches land on kicks, not hi-hats.
 
+## Tempo test tracks (user-confirmed BPM)
+
+Re-check these live after any change to capture, analysis or `TempoTracker`. Status as of
+`842d612`, confirmed by the user on the overlay unless noted.
+
+| Track | True BPM | Reads | What it exercises |
+| --- | --- | --- | --- |
+| Kosheen — Catch | 130 | 130 (pre-framing-fix) | bass line carries no beat → needs full-band flux |
+| KLF — What Time Is Love | 120 | not re-checked since fixes | 1.5-beat riff (3:2 rival) |
+| Warpaint — Disco | 97 | 97 | strong half-beat (8th-note) periodicity |
+| Lazerhawk — Overdrive | 133 | 133 | kick/snare alternation → half-tempo trap |
+| Future Sound of London — Papua New Guinea | 125 | 124 after ~175 at startup | two kicks per 2-beat cycle |
+| Massive Attack — Teardrop | 77 | 77 (offline, from a recording) | slow tempo; must not be doubled |
+| Public Service Broadcasting — I Was Always Dreaming | unknown | never locks (conf 0.10-0.18) | low-confidence / "searching" path |
+
 ## AudioFrame contract (concrete)
 
 `Audio/AudioFrame.cs` — an immutable **sealed class** (not a struct — see rationale below):
