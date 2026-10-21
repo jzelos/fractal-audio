@@ -42,6 +42,16 @@ public sealed class TempoTracker
     // lag's. Without it, "Catch" (130 BPM) dropped to a syncopated 91 BPM after 30s locked,
     // because that rival out-scored the beat for just 2s in one passage.
     private const float TempoStickiness = 0.8f;
+
+    // Dotted-riff (3:2) handling. "What Time Is Love" (KLF, 120 BPM) has a riff repeating every
+    // 1.5 beats that dominates every band (ACF 0.76 at 79 BPM vs 0.46 at 120). Promote: when the
+    // best lag has a rival at ~2/3 of it scoring >= DottedRatio x best AND the kick (bass flux)
+    // supports the rival at least as well, the rival is the beat. The bass gate matters:
+    // "Papua New Guinea" has a 3:2 rival too, but its kick supports the slower period. Protect:
+    // an established tempo isn't displaced by its own 1.5x-period riff unless it drops below
+    // DottedRatio x the riff's score. Offline on all three dumps: 100% of estimates right.
+    private const float DottedRatio = 0.5f;
+    private const float MinBassSupport = 0.2f;
     private const float PhaseGain = 0.3f;
     private const float MaxPhaseCorrection = 0.05f; // cycles per estimate.
     private const float BigPhaseError = 0.25f;
@@ -51,6 +61,8 @@ public sealed class TempoTracker
     private readonly float _leadCycles;
     private readonly float[] _history = new float[HistoryTicks];
     private readonly float[] _window = new float[HistoryTicks];
+    private readonly float[] _bassHistory = new float[HistoryTicks];
+    private readonly float[] _bassWindow = new float[HistoryTicks];
     private readonly float[] _fold = new float[FoldBins];
     private readonly int[] _foldCount = new int[FoldBins];
     private readonly List<float> _pendingPeriods = new();
@@ -83,10 +95,13 @@ public sealed class TempoTracker
     /// <summary>Beat phase in [0,1): 0 at a beat, rising to 1 just before the next.</summary>
     public float Phase => _phase;
 
-    /// <summary>Feeds one tick of onset strength; returns true on a grid beat (only while locked).</summary>
-    public bool Process(float onsetStrength)
+    /// <summary>Feeds one tick of onset strength (the tempo signal) and bass-band onset strength
+    /// (kick evidence, used only to arbitrate 3:2 ambiguity); returns true on a grid beat (only
+    /// while locked).</summary>
+    public bool Process(float onsetStrength, float bassOnsetStrength)
     {
         _history[_written % HistoryTicks] = onsetStrength;
+        _bassHistory[_written % HistoryTicks] = bassOnsetStrength;
         _written++;
 
         if (_written >= MinHistoryTicks && ++_ticksSinceEstimate >= EstimateEveryTicks)
@@ -130,6 +145,7 @@ public sealed class TempoTracker
         for (int i = 0; i < n; i++)
         {
             _window[i] = _history[(start + i) % HistoryTicks];
+            _bassWindow[i] = _bassHistory[(start + i) % HistoryTicks];
             mean += _window[i];
         }
         mean /= n;
@@ -169,12 +185,30 @@ public sealed class TempoTracker
             }
         }
 
-        // Hysteresis: stay on the current tempo unless a rival clearly beats it.
-        int currentLag = (int)MathF.Round(_period);
-        if (_period > 0f && currentLag >= minLag && currentLag <= maxLag
-            && _lagScore[currentLag] >= TempoStickiness * bestScore)
+        // Promote a kick-supported rival at ~2/3 of the best lag (the beat under a dotted riff).
+        bool promoted = false;
+        int rivalLag = BestNear(2f * bestLag / 3f, minLag, maxLag);
+        if (rivalLag > 0 && _lagScore[rivalLag] >= DottedRatio * _lagScore[bestLag])
         {
-            bestLag = currentLag;
+            float bassAtRival = BassAutocorrelation(rivalLag, n);
+            if (bassAtRival >= MinBassSupport && bassAtRival >= BassAutocorrelation(bestLag, n))
+            {
+                bestLag = rivalLag;
+                promoted = true;
+            }
+        }
+
+        // Hysteresis: stay on the current tempo unless a rival clearly beats it — and be much
+        // stickier against the current beat's own dotted-riff period (1.5x its lag).
+        int currentLag = (int)MathF.Round(_period);
+        if (!promoted && _period > 0f && currentLag >= minLag && currentLag <= maxLag)
+        {
+            bool rivalIsDottedRiff = MathF.Abs(((float)bestLag / currentLag) - 1.5f) < 0.06f;
+            float keep = rivalIsDottedRiff ? DottedRatio : TempoStickiness;
+            if (_lagScore[currentLag] >= keep * _lagScore[bestLag])
+            {
+                bestLag = currentLag;
+            }
         }
         float bestAc = _lagAc[bestLag];
 
@@ -252,6 +286,46 @@ public sealed class TempoTracker
             _phase += Math.Clamp(PhaseGain * error, -MaxPhaseCorrection, MaxPhaseCorrection);
             _phase -= MathF.Floor(_phase);
         }
+    }
+
+    /// <summary>Of round(target) and its two neighbours within [minLag, maxLag], the lag with
+    /// the highest autocorrelation; 0 if none is in range.</summary>
+    private int BestNear(float target, int minLag, int maxLag)
+    {
+        int best = 0;
+        int centre = (int)MathF.Round(target);
+        for (int lag = centre - 1; lag <= centre + 1; lag++)
+        {
+            if (lag >= minLag && lag <= maxLag && (best == 0 || _lagAc[lag] > _lagAc[best]))
+            {
+                best = lag;
+            }
+        }
+        return best;
+    }
+
+    /// <summary>Normalised autocorrelation of the bass onset signal over the current window.</summary>
+    private float BassAutocorrelation(int lag, int n)
+    {
+        float mean = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            mean += _bassWindow[i];
+        }
+        mean /= n;
+
+        float energy = 0f;
+        float ac = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float d = _bassWindow[i] - mean;
+            energy += d * d;
+            if (i + lag < n)
+            {
+                ac += d * (_bassWindow[i + lag] - mean);
+            }
+        }
+        return energy > 1e-12f ? ac / energy : 0f;
     }
 
     private void UpdateLock(float confidence)

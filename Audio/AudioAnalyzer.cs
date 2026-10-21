@@ -219,7 +219,7 @@ public sealed class AudioAnalyzer : IDisposable
         int beatStart = _bandBinStart[BeatBandFirst];
         int beatEnd = _bandBinEnd[BeatBandLast];
         (_, bool rawBeat) = _beatDetector.Process(_magnitudes.AsSpan(beatStart, beatEnd - beatStart));
-        bool gridBeat = _tempo.Process(TempoOnsetStrength(_beatDetector.RawFlux));
+        bool gridBeat = _tempo.Process(TempoOnsetStrength(_beatDetector.RawFlux), _beatDetector.RawFlux);
         bool beatDetected = _tempo.Locked ? gridBeat : rawBeat;
 
         if (onsetDetected)

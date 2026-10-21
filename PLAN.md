@@ -662,3 +662,15 @@ parametric curve". Concretely, for Tier 1:
   current tempo while its prior-weighted ACF >= 0.8 x best). Final live run, 75s: locked at 130
   within 5s; all 122 readings after 12s in 129.5-131.5 BPM; overlay screenshot shows 130.3 LOCKED.
   PNG re-checked only offline (on a 64-bin dump), not live.
+- 2026-10-21 [worker] "What Time Is Love" (KLF, 120 BPM) locked at 79. 60s dump (temporary):
+  a riff repeating every 1.5 beats dominates every band (ACF 0.76 at 79 vs 0.46 at 120); during
+  the riff-only section even the bass follows it, and once the four-on-the-floor kick enters the
+  bass ACF flips to 120 — but score stickiness then held 79. A metrical comb (ACF summed at
+  1-4x lag) was tried and rejected offline (broke Catch and PNG: any beat-periodic pattern also
+  correlates at the riff's multiples). Added 3:2 rules to `TempoTracker`: promote a rival at
+  ~2/3 of the best lag when it scores >= 0.5x and the bass ACF supports it (>= 0.2 and >= bass at
+  the best lag — PNG has a 3:2 rival its kick does not support); protect an established tempo
+  from its own 1.5x-period riff unless it drops below 0.5x. `Process` now takes the bass onset
+  signal too. Offline full-tracker simulation: 100% of estimates right on all three dumps (KLF
+  ~119, Catch ~130, PNG ~61). Live re-run read a steady 131.7 with the raw kick detector
+  independently at 132/min — most likely a different track by then; KLF NOT re-verified live.
