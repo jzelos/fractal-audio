@@ -23,6 +23,28 @@ Shaders in `shaders/` are copied to the output folder and hot-reloaded: edit the
 `bin/Debug/net8.0/shaders/` while the app runs and it recompiles live. A shader with errors is
 reported to the console and the last working version keeps rendering.
 
+## Tempo diagnostics
+
+The on-screen overlay (toggle with **D**) shows the tempo estimate, lock state and confidence;
+tap **T** or **Space** along with the music to compare your tempo with the tracker's.
+
+To record what the beat tracker sees, set `SDL_DEMO_DUMP` to a file path before running:
+
+```powershell
+$env:SDL_DEMO_DUMP = "C:\temp\track.csv"; dotnet run --project SDL_Demo.csproj
+```
+
+`tools/TempoReplay` feeds such dumps through the app's own beat pipeline and scores the tempo
+against known BPMs, so tracker changes can be checked against recordings without replaying
+the music:
+
+```powershell
+dotnet run --project tools/TempoReplay -- C:\temp\track.csv=150 C:\temp\other.csv=97 --timeline
+```
+
+`--trace=FROM-TO` prints each estimate's decision steps within that time range (seconds). The
+tool exits non-zero if any dump scores below 90%.
+
 ## Layout
 
 | Path | What it does |
@@ -32,6 +54,8 @@ reported to the console and the last working version keeps rendering.
 | `Graphics/` | GL loader, shader program + hot reload, fullscreen quad, palette atlas |
 | `Mapping/` | `AudioToFractalMapper` — the single place audio features become shader uniforms; `JuliaBounds` keeps the shape on screen |
 | `shaders/` | `quad.vert`, `fractal.frag` (Julia escape-time with smooth colouring) |
+| `Diagnostics/` | On-screen overlay text and tap tempo |
+| `tools/TempoReplay/` | Replays tempo dumps through the beat pipeline (see Tempo diagnostics) |
 
 ## Docs
 

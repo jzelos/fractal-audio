@@ -19,4 +19,10 @@
     <None Include="shaders\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- Dev tools are separate projects; keep the app from compiling their sources. -->
+  <ItemGroup>
+    <Compile Remove="tools\**" />
+    <None Remove="tools\**" />
+  </ItemGroup>
+
 </Project>

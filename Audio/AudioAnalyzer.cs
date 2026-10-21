@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Globalization;
 using NAudio.Dsp;
 
 namespace SDL_Demo.Audio;
@@ -8,47 +9,24 @@ namespace SDL_Demo.Audio;
 /// Analyses <see cref="AudioCapture"/>'s mono stream in uniform audio-time frames (one per 20ms
 /// of captured samples — see <see cref="TickLoop"/>), on its own thread, and per frame runs a
 /// 2048-point Hann-windowed FFT via <c>NAudio.Dsp.FastFourierTransform.FFT</c>, bins into 7
-/// log-spaced-by-Hz-range bands computed from the capture's *actual* sample rate, computes
-/// RMS/peak/spectral centroid, runs a per-band <see cref="EnvelopeFollower"/>, runs
-/// <see cref="OnsetDetector"/> twice (full-spectrum for general onsets, 20-150 Hz only for
-/// kick-carried beats), and publishes one <see cref="AudioFrame"/> per tick to
-/// <see cref="AudioFrameBus"/>.
+/// log-spaced-by-Hz-range bands computed from the capture's *actual* sample rate
+/// (<see cref="BandLayout"/>), computes RMS/peak/spectral centroid, runs a per-band
+/// <see cref="EnvelopeFollower"/>, a full-spectrum <see cref="OnsetDetector"/> for general
+/// onsets, and the <see cref="BeatPipeline"/> (kick detector + tempo tracker), and publishes one
+/// <see cref="AudioFrame"/> per frame to <see cref="AudioFrameBus"/>.
+///
+/// Setting the SDL_DEMO_DUMP environment variable to a file path writes every frame's spectrum to
+/// that file (see <see cref="WriteDumpRow"/>), for offline analysis and tools/TempoReplay.
 /// </summary>
 public sealed class AudioAnalyzer : IDisposable
 {
     private const int FftSize = 2048;       // power of two, per plan.
     private const int FftSizeLog2 = 11;     // log2(2048), required by FastFourierTransform.FFT's `m` parameter.
-    private const int BandCount = 7;
-    private const double TickIntervalSeconds = 1.0 / 50.0; // analyzer tick rate — decoupled from capture/render.
+    private const int BandCount = BandLayout.BandCount;
+    private const double TickIntervalSeconds = 1.0 / BeatPipeline.FrameRate;
     private const double AttackMs = 10.0;
     private const double ReleaseMs = 300.0;
     private const double ConsoleLogIntervalSeconds = 0.5; // ~2/sec, per plan's test instructions.
-
-    // Band edges in Hz: sub-bass, bass, low-mid, mid, high-mid, presence, air.
-    private static readonly float[] BandEdgesHz = { 20f, 60f, 150f, 400f, 1000f, 2500f, 6000f, 12000f };
-
-    // Beat detector covers sub-bass + bass (bands 0..1, i.e. 20-150 Hz) — the kick carrier.
-    private const int BeatBandFirst = 0;
-    private const int BeatBandLast = 1;
-    // Stricter than the general detector (playtest 2: bass lines were triggering "beats"): a
-    // longer history so a busy bass line raises the baseline, a higher multiplier so only
-    // kick-sized jumps clear it, and a longer refractory period.
-    private const int BeatHistoryTicks = 75;           // ~1.5s at 50Hz.
-    private const float BeatThresholdMultiplier = 2.0f;
-    private const int BeatRefractoryTicks = 20;        // ~400ms at 50Hz, i.e. caps at ~150 BPM.
-
-    // Grid beats fire this early to cover the analysis window (~20-40ms behind the kick, per the
-    // offline prototype) plus about a frame of display latency.
-    private const float BeatLeadSeconds = 0.05f;
-
-    // Tempo tracker input: full-band log-compressed flux plus half-weighted bass flux, each
-    // normalised by its own running mean. Bass alone failed on "Catch" (Kosheen, 130 BPM): its
-    // sustained bass line has ~no periodicity at the beat (ACF 0.07) while full-band log flux
-    // peaks exactly at 130 (0.57). Full-band alone failed the bass-carried "Papua New Guinea".
-    // 0.5 was the only weight good on both recordings offline.
-    private const float OnsetLogScale = 1000f;          // log1p(scale * magnitude) compression.
-    private const float TempoBassWeight = 0.5f;
-    private const double OnsetMeanSeconds = 10.0;       // running-mean time constant for normalisation.
 
     private readonly AudioCapture _capture;
     private readonly AudioFrameBus _bus;
@@ -56,8 +34,7 @@ public sealed class AudioAnalyzer : IDisposable
 
     private readonly EnvelopeFollower[] _envelopeFollowers;
     private readonly OnsetDetector _onsetDetector = new();
-    private readonly OnsetDetector _beatDetector = new(BeatHistoryTicks, BeatThresholdMultiplier, BeatRefractoryTicks);
-    private readonly TempoTracker _tempo = new((float)(1.0 / TickIntervalSeconds), BeatLeadSeconds);
+    private readonly BeatPipeline _beats = new();
     private long _onsetCount;
     private long _beatCount;
     private long _rawKickCount;
@@ -65,16 +42,15 @@ public sealed class AudioAnalyzer : IDisposable
     private readonly float[] _sampleWindow = new float[FftSize];
     private readonly Complex[] _fftBuffer = new Complex[FftSize];
     private readonly float[] _magnitudes = new float[FftSize / 2];
-    private readonly float[] _previousLogMagnitudes = new float[FftSize / 2];
-    private float _fullFluxMean;
-    private float _bassFluxMean;
-    private int _onsetMeanTicks;
 
-    private int[] _bandBinStart = new int[BandCount];
-    private int[] _bandBinEnd = new int[BandCount];
+    private readonly int[] _bandBinStart = new int[BandCount];
+    private readonly int[] _bandBinEnd = new int[BandCount];
     private int _bandEdgesSampleRate = -1;
 
     private float _centroidRunningMaxHz = 1000f;
+
+    private readonly StreamWriter? _dump;
+    private bool _dumpHeaderWritten;
 
     private Thread? _thread;
     private volatile bool _running;
@@ -89,6 +65,12 @@ public sealed class AudioAnalyzer : IDisposable
         for (int i = 0; i < BandCount; i++)
         {
             _envelopeFollowers[i] = new EnvelopeFollower(AttackMs, ReleaseMs, TickIntervalSeconds);
+        }
+
+        if (Environment.GetEnvironmentVariable("SDL_DEMO_DUMP") is { Length: > 0 } dumpPath)
+        {
+            _dump = new StreamWriter(dumpPath) { AutoFlush = true };
+            Console.WriteLine($"[AudioAnalyzer] dumping frames to {dumpPath}");
         }
     }
 
@@ -117,7 +99,7 @@ public sealed class AudioAnalyzer : IDisposable
 
     /// <summary>
     /// Frames the analysis by audio time, not wall-clock time. WASAPI loopback delivers audio in
-    /// ~50ms bursts, so the old "every 20ms, analyse the latest 2048 samples" loop re-analysed an
+    /// bursts, so the old "every 20ms, analyse the latest 2048 samples" loop re-analysed an
     /// identical window on ~60% of ticks and then jumped; the onset signal was effectively 20Hz
     /// with irregular timing, and the 20ms/50ms aliasing produced a phantom ~79 BPM periodicity
     /// that every tempo test track showed. Now every captured hop of samples (20ms of audio) is
@@ -177,7 +159,6 @@ public sealed class AudioAnalyzer : IDisposable
     /// <summary>Analyses <see cref="_sampleWindow"/> (one frame) and publishes an AudioFrame.</summary>
     private void AnalyzeWindow()
     {
-
         double sumSquares = 0;
         float peak = 0f;
         for (int i = 0; i < FftSize; i++)
@@ -249,12 +230,8 @@ public sealed class AudioAnalyzer : IDisposable
         float centroid01 = _centroidRunningMaxHz > 1e-6f ? Math.Clamp(centroidHz / _centroidRunningMaxHz, 0f, 1f) : 0f;
 
         (float normalizedFlux, bool onsetDetected) = _onsetDetector.Process(_magnitudes);
-
-        int beatStart = _bandBinStart[BeatBandFirst];
-        int beatEnd = _bandBinEnd[BeatBandLast];
-        (_, bool rawBeat) = _beatDetector.Process(_magnitudes.AsSpan(beatStart, beatEnd - beatStart));
-        bool gridBeat = _tempo.Process(TempoOnsetStrength(_beatDetector.RawFlux), _beatDetector.RawFlux);
-        bool beatDetected = _tempo.Locked ? gridBeat : rawBeat;
+        (bool beatDetected, bool rawKick) = _beats.Process(_magnitudes, _bandBinStart, _bandBinEnd);
+        TempoTracker tempo = _beats.Tempo;
 
         if (onsetDetected)
         {
@@ -264,7 +241,7 @@ public sealed class AudioAnalyzer : IDisposable
         {
             _beatCount++;
         }
-        if (rawBeat)
+        if (rawKick)
         {
             _rawKickCount++;
         }
@@ -284,48 +261,48 @@ public sealed class AudioAnalyzer : IDisposable
             BeatDetected = beatDetected,
             OnsetCount = _onsetCount,
             BeatCount = _beatCount,
-            TempoLocked = _tempo.Locked,
-            TempoBpm = _tempo.Bpm,
-            BeatPhase = _tempo.Phase,
-            TempoConfidence = _tempo.Confidence,
+            TempoLocked = tempo.Locked,
+            TempoBpm = tempo.Bpm,
+            BeatPhase = tempo.Phase,
+            TempoConfidence = tempo.Confidence,
             RawKickCount = _rawKickCount,
             BandEnergies = bandEnergies.MoveToImmutable(),
             BandEnergiesRaw = bandEnergiesRaw.MoveToImmutable(),
         };
 
         _bus.Publish(frame);
-
+        WriteDumpRow(frame);
         MaybeLogToConsole(frame);
     }
 
-    /// <summary>Onset-strength sample for <see cref="TempoTracker"/>: full-band (sub-bass to air)
-    /// log-compressed spectral flux, plus <see cref="TempoBassWeight"/> x the bass-band flux, each
-    /// divided by its running mean so neither dominates by scale.</summary>
-    private float TempoOnsetStrength(float bassFlux)
+    /// <summary>
+    /// Opt-in frame dump (SDL_DEMO_DUMP=path). Format: a header line
+    /// "# sdl-demo-dump v1 sampleRate=N fftSize=N bins=N", then one row per frame:
+    /// "seconds,tempoBpm,mag[1],...,mag[bins]" — magnitudes up to the top band's end, which is
+    /// everything the beat pipeline reads, so tools/TempoReplay can reproduce it exactly.
+    /// </summary>
+    private void WriteDumpRow(AudioFrame frame)
     {
-        int start = _bandBinStart[0];
-        int end = _bandBinEnd[BandCount - 1];
-        float fullFlux = 0f;
-        for (int i = start; i < end; i++)
+        if (_dump == null)
         {
-            float logMag = MathF.Log(1f + (OnsetLogScale * _magnitudes[i]));
-            float delta = logMag - _previousLogMagnitudes[i];
-            if (delta > 0f)
-            {
-                fullFlux += delta;
-            }
-            _previousLogMagnitudes[i] = logMag;
+            return;
         }
 
-        // Cumulative average until enough ticks have passed, then the fixed time constant — so the
-        // means are right from the first tick rather than ramping up from zero.
-        _onsetMeanTicks++;
-        float alpha = Math.Max((float)(TickIntervalSeconds / OnsetMeanSeconds), 1f / _onsetMeanTicks);
-        _fullFluxMean += alpha * (fullFlux - _fullFluxMean);
-        _bassFluxMean += alpha * (bassFlux - _bassFluxMean);
+        int bins = _bandBinEnd[BandCount - 1];
+        if (!_dumpHeaderWritten)
+        {
+            _dump.WriteLine($"# sdl-demo-dump v1 sampleRate={_capture.SampleRate} fftSize={FftSize} bins={bins}");
+            _dumpHeaderWritten = true;
+        }
 
-        return (fullFlux / Math.Max(_fullFluxMean, 1e-6f))
-            + (TempoBassWeight * bassFlux / Math.Max(_bassFluxMean, 1e-9f));
+        var row = new System.Text.StringBuilder(bins * 10);
+        row.Append(frame.TimestampSeconds.ToString("F4", CultureInfo.InvariantCulture))
+            .Append(',').Append(frame.TempoBpm.ToString("F2", CultureInfo.InvariantCulture));
+        for (int i = 1; i <= bins; i++)
+        {
+            row.Append(',').Append(_magnitudes[i].ToString("G6", CultureInfo.InvariantCulture));
+        }
+        _dump.WriteLine(row.ToString());
     }
 
     private void EnsureBandBinsFor(int sampleRate)
@@ -336,22 +313,7 @@ public sealed class AudioAnalyzer : IDisposable
         }
 
         _bandEdgesSampleRate = sampleRate;
-        float binWidthHz = (float)sampleRate / FftSize;
-        int maxBin = (FftSize / 2) - 1;
-
-        int[] edgeBins = new int[BandEdgesHz.Length];
-        for (int i = 0; i < BandEdgesHz.Length; i++)
-        {
-            edgeBins[i] = Math.Clamp((int)MathF.Round(BandEdgesHz[i] / binWidthHz), 0, maxBin);
-        }
-
-        for (int b = 0; b < BandCount; b++)
-        {
-            int start = edgeBins[b];
-            int end = Math.Max(start + 1, edgeBins[b + 1]);
-            _bandBinStart[b] = start;
-            _bandBinEnd[b] = Math.Min(end, maxBin + 1);
-        }
+        BandLayout.Compute(sampleRate, FftSize, _bandBinStart, _bandBinEnd);
     }
 
     private void MaybeLogToConsole(AudioFrame frame)
@@ -372,5 +334,6 @@ public sealed class AudioAnalyzer : IDisposable
     public void Dispose()
     {
         Stop();
+        _dump?.Dispose();
     }
 }

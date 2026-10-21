@@ -266,6 +266,12 @@ fade rather than snap; waypoint jumps and zoom punches land on kicks, not hi-hat
 
 ## Tempo test tracks (user-confirmed BPM)
 
+Recordings of these (SDL_DEMO_DUMP) can be scored with `tools/TempoReplay`; the dumps live
+outside the repo (they are tens of MB). Replay scores at `HEAD` (exact = within 3%, readings
+every 0.5s after 10s): Overdrive, Disco, Teardrop, Catch, PNG 98-100%; Hyperspeed 79% (misses
+are its half-time intro, corrected once the full beat enters); KLF 46% (riff-only intro reads
+79 until the kick enters — Catch, KLF and PNG dumps predate the audio-time framing fix).
+
 Re-check these live after any change to capture, analysis or `TempoTracker`. Status as of
 `842d612`, confirmed by the user on the overlay unless noted.
 

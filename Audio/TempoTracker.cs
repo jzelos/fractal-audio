@@ -38,6 +38,13 @@ public sealed class TempoTracker
     private const float PeriodSmoothing = 0.3f;
     private const float TempoChangeTolerance = 0.06f;
     private const int TempoChangePersist = 4;      // 2s of agreeing estimates before switching tempo.
+    // Once a tempo has held for EstablishedAfterEstimates, switching needs much longer agreement.
+    // Songs rarely change tempo, but riffs on the 16th-note grid briefly out-score the beat:
+    // "Hyperspeed" (150 BPM) lost an established 150 to a 5-sixteenth acid pattern (120 BPM)
+    // after 2s, and to its half-tempo whenever the kick evidence dipped for 2s. The exception is
+    // an up-octave correction backed by kick evidence (the half-cycle rule), which stays fast.
+    private const int EstablishedAfterEstimates = 6;        // 3s.
+    private const int EstablishedTempoChangePersist = 20;   // 10s.
     // Keep the current tempo while its prior-weighted ACF is at least this fraction of the best
     // lag's. Without it, "Catch" (130 BPM) dropped to a syncopated 91 BPM after 30s locked,
     // because that rival out-scored the beat for just 2s in one passage.
@@ -62,6 +69,11 @@ public sealed class TempoTracker
     // Overdrive 0.80 (-> doubled, exact 133), Disco 0.17-0.52, Teardrop 0.16-0.29 (unchanged).
     private const float HalfCycleKickRatio = 0.6f;
     private const float MinBassFoldSharpness = 2.0f; // bass must have a clear beat to be trusted.
+    // A near-equal half-cycle kick is strong enough evidence on its own to accept a less sharp
+    // fold: "Hyperspeed" (Prodigy, 150 BPM) dropped to 75 in its heavy breakbeat sections, where
+    // the spread-out kick pattern folds at only 1.8-1.9 sharpness but with ratios of 0.94-0.98.
+    private const float StrongHalfCycleKickRatio = 0.85f;
+    private const float MinBassFoldSharpnessStrong = 1.6f;
     private const float PhaseGain = 0.3f;
     private const float MaxPhaseCorrection = 0.05f; // cycles per estimate.
     private const float BigPhaseError = 0.25f;
@@ -81,6 +93,9 @@ public sealed class TempoTracker
     private int _written;
     private int _ticksSinceEstimate;
     private int _windowLength;   // valid samples in _window for the current estimate.
+    private int _estimatesAtPeriod; // estimates since the period last switched (establishment).
+    private float _lastKickSharpness; // trace only.
+    private float _lastKickRatio;     // trace only.
 
     private float _period;       // in ticks; 0 until the first estimate.
     private float _phase;        // cycle fraction elapsed since the last beat.
@@ -97,6 +112,11 @@ public sealed class TempoTracker
         _tickRate = tickRate;
         _leadCycles = leadSeconds * tickRate;
     }
+
+    /// <summary>When set (tools/TempoReplay --trace), each estimate records its decision steps
+    /// in <see cref="LastTrace"/>. Off in the app.</summary>
+    public bool TraceEstimates { get; set; }
+    public string? LastTrace { get; private set; }
 
     public bool Locked { get; private set; }
     public float Bpm => _period > 0 ? 60f * _tickRate / _period : 0f;
@@ -195,6 +215,8 @@ public sealed class TempoTracker
             }
         }
 
+        int acBestLag = bestLag;
+
         // Promote a kick-supported rival at ~2/3 of the best lag (the beat under a dotted riff).
         bool promoted = false;
         int rivalLag = BestNear(2f * bestLag / 3f, minLag, maxLag);
@@ -237,14 +259,27 @@ public sealed class TempoTracker
         }
 
         // Half-tempo check on the kick's fold shape (see HalfCycleKickRatio).
-        if (estimate / 2f >= minLag && KickLandsOnHalfCycle(estimate))
+        float refined = estimate;
+        bool halved = estimate / 2f >= minLag && KickLandsOnHalfCycle(estimate);
+        if (halved)
         {
             estimate /= 2f;
+        }
+
+        if (TraceEstimates)
+        {
+            float Bpm(float lag) => 60f * _tickRate / lag;
+            LastTrace = $"acf best {Bpm(acBestLag):F0} (ac {_lagAc[acBestLag]:F2})" +
+                $"{(promoted ? " promoted3:2" : string.Empty)} -> lag {Bpm(bestLag):F0} (ac {_lagAc[bestLag]:F2})" +
+                $" refined {Bpm(refined):F1} kick sharp {_lastKickSharpness:F2} ratio {_lastKickRatio:F2}" +
+                $"{(halved ? " HALVED" : string.Empty)} => est {Bpm(estimate):F1}" +
+                $" | period {(_period > 0 ? Bpm(_period) : 0f):F1} pending {_pendingPeriods.Count}";
         }
 
         if (_period <= 0f)
         {
             _period = estimate;
+            _estimatesAtPeriod = 0;
         }
         else if (MathF.Abs((estimate / _period) - 1f) <= TempoChangeTolerance)
         {
@@ -253,16 +288,27 @@ public sealed class TempoTracker
         }
         else
         {
-            // A different tempo, or an octave error: only switch once it persists.
+            // A different tempo, or an octave error: only switch once it persists — for much
+            // longer once the current tempo is established, unless it's a kick-backed up-octave
+            // correction.
+            // Kick-backed corrections: the half-cycle up-octave fix, or a 3:2 promotion.
+            bool kickBackedFix = (halved && MathF.Abs((estimate / _period) - 0.5f) <= TempoChangeTolerance)
+                || promoted;
+            int persist = kickBackedFix || _estimatesAtPeriod < EstablishedAfterEstimates
+                ? TempoChangePersist
+                : EstablishedTempoChangePersist;
+
             _pendingPeriods.RemoveAll(p => MathF.Abs((estimate / p) - 1f) > TempoChangeTolerance);
             _pendingPeriods.Add(estimate);
-            if (_pendingPeriods.Count >= TempoChangePersist)
+            if (_pendingPeriods.Count >= persist)
             {
                 _period = estimate;
                 _pendingPeriods.Clear();
                 _reseedPhase = true;
+                _estimatesAtPeriod = 0;
             }
         }
+        _estimatesAtPeriod++;
 
         // 3. Lock hysteresis.
         UpdateLock(bestAc);
@@ -356,6 +402,7 @@ public sealed class TempoTracker
         {
             Locked = false;
             _reseedPhase = true;
+            _estimatesAtPeriod = 0; // e.g. silence between tracks: let the next song lock quickly.
         }
     }
 
@@ -365,7 +412,9 @@ public sealed class TempoTracker
     private bool KickLandsOnHalfCycle(float period)
     {
         float sharpness = FoldSharpness(period, _bassWindow);
-        if (sharpness < MinBassFoldSharpness)
+        _lastKickSharpness = sharpness;
+        _lastKickRatio = 0f;
+        if (sharpness < MinBassFoldSharpnessStrong)
         {
             return false;
         }
@@ -388,7 +437,11 @@ public sealed class TempoTracker
         {
             half = Math.Max(half, _fold[(peak + (FoldBins / 2) + d + FoldBins) % FoldBins]);
         }
-        return half / _fold[peak] >= HalfCycleKickRatio;
+        float ratio = half / _fold[peak];
+        _lastKickRatio = ratio;
+        return sharpness >= MinBassFoldSharpness
+            ? ratio >= HalfCycleKickRatio
+            : ratio >= StrongHalfCycleKickRatio;
     }
 
     /// <summary>Folds the tempo-signal window at <paramref name="period"/> ticks into
