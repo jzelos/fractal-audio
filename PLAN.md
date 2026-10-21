@@ -647,3 +647,8 @@ parametric curve". Concretely, for Tier 1:
   D/F1 toggle, T/Space tap. Verified by screenshotting the live window: overlay renders,
   updates, locked tempo shown. Tap input NOT verified live (injected keys didn't reach the
   window).
+- 2026-10-21 [worker] The first overlay screenshot showed a dust set (c = -0.799-0.295i)
+  spilling off-screen: `JuliaBounds` at 48 iterations found no surviving grid point, so the fit
+  kept the stale zoom. TestIter 48 -> 16: dust now gets a real extent (fit 0.78, rendered inside
+  the 10% border), connected sets unchanged (checked offline). Re-screenshot: silhouette within
+  the border.

@@ -6,17 +6,21 @@ namespace SDL_Demo.Mapping;
 ///
 /// Julia sets of z^2 + c are symmetric under z -> -z, so the silhouette is always centred on the
 /// origin and only its half-extents matter (and only the upper half-plane needs sampling). Uses
-/// a deliberately low iteration count: points that escape slowly still look dark/near-boundary on
-/// screen, so counting them as "inside" errs toward a slightly larger box — the safe direction
-/// for keeping the shape within the border — and also gives a sensible extent for disconnected
-/// (dust) sets, which have no true interior.
+/// a deliberately low iteration count: slow-escaping points are what the shader draws as visible
+/// structure, so counting them as "inside" errs toward a slightly larger box — the safe direction
+/// for keeping the shape within the border — and is what gives disconnected (dust) sets, which
+/// have no true interior, any extent at all.
 /// </summary>
 public static class JuliaBounds
 {
     private const float Extent = 2.0f;   // the filled Julia set always lies within |z| <= 2.
     private const int GridX = 128;       // ~0.03 cell; coarser grids made the fit zoom visibly step.
     private const int GridY = 64;        // upper half-plane only, by symmetry.
-    private const int TestIter = 48;
+    // Low on purpose. At 48, a disconnected (dust) set had *no* grid point survive, so the fit
+    // fell back to the previous zoom and the visible spirals ran off-screen (seen in a live
+    // screenshot at c = -0.799-0.295i). At 16 the dust gets a real extent; connected sets measure
+    // the same as at 48 (checked offline on rendered fits).
+    private const int TestIter = 16;
 
     /// <summary>Returns (maxAbsX, maxAbsY) of the sampled set, or null if nothing stayed bounded.</summary>
     public static (float MaxX, float MaxY)? Measure(float cx, float cy)
