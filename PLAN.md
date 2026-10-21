@@ -277,6 +277,7 @@ Re-check these live after any change to capture, analysis or `TempoTracker`. Sta
 | Lazerhawk — Overdrive | 133 | 133 | kick/snare alternation → half-tempo trap |
 | Future Sound of London — Papua New Guinea | 125 | 124 after ~175 at startup | two kicks per 2-beat cycle |
 | Massive Attack — Teardrop | 77 | 77 (offline, from a recording) | slow tempo; must not be doubled |
+| The Prodigy — Hyperspeed | 150 | 150 | fastest tested; octave rules must not halve/double it |
 | Public Service Broadcasting — I Was Always Dreaming | unknown | never locks (conf 0.10-0.18) | low-confidence / "searching" path |
 
 ## AudioFrame contract (concrete)
