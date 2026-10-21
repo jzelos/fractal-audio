@@ -37,12 +37,22 @@ public sealed class AudioCapture : IDisposable
     private int _writePos;       // next write index into _ringBuffer, mod _ringCapacity
     private long _totalSamplesWritten;
 
-    private WasapiLoopbackCapture? _capture;
+    private const int CaptureBufferMs = 20;     // NAudio polls at half this; see LowLatencyLoopbackCapture.
+
+    private LowLatencyLoopbackCapture? _capture;
     private Thread? _monitorThread;
     private volatile bool _running;
     private volatile bool _hasEverReceivedData;
     private long _startUtcTicks;
     private long _lastDataAvailableUtcTicks;
+
+    // Delivery statistics, logged every StatsIntervalSeconds: packet rate/size show how bursty
+    // delivery is (the analyzer's visual latency), and the effective sample rate falling below
+    // the nominal one would mean the capture buffer is overrunning and dropping audio.
+    private const double StatsIntervalSeconds = 10.0;
+    private long _statsPackets;
+    private long _statsSamples;
+    private long _statsStartUtcTicks;
 
     public CaptureStatus Status { get; private set; } = CaptureStatus.DeviceUnavailable;
     public WaveFormat WaveFormat { get; private set; } = new WaveFormat(48000, 16, 1);
@@ -63,7 +73,7 @@ public sealed class AudioCapture : IDisposable
             return;
         }
 
-        _capture = new WasapiLoopbackCapture();
+        _capture = new LowLatencyLoopbackCapture(CaptureBufferMs);
         WaveFormat = _capture.WaveFormat;
         Console.WriteLine($"[AudioCapture] actual WaveFormat: {WaveFormat}");
 
@@ -121,6 +131,7 @@ public sealed class AudioCapture : IDisposable
             }
 
             Status = next;
+            MaybeLogDeliveryStats(nowTicks);
 
             if (next != lastLogged)
             {
@@ -143,6 +154,32 @@ public sealed class AudioCapture : IDisposable
         }
     }
 
+    private void MaybeLogDeliveryStats(long nowTicks)
+    {
+        if (_statsStartUtcTicks == 0)
+        {
+            _statsStartUtcTicks = nowTicks;
+            return;
+        }
+
+        double seconds = TimeSpan.FromTicks(nowTicks - _statsStartUtcTicks).TotalSeconds;
+        if (seconds < StatsIntervalSeconds)
+        {
+            return;
+        }
+
+        long packets = Interlocked.Exchange(ref _statsPackets, 0);
+        long samples = Interlocked.Exchange(ref _statsSamples, 0);
+        _statsStartUtcTicks = nowTicks;
+        if (packets > 0 && Status == CaptureStatus.Capturing)
+        {
+            Console.WriteLine(
+                $"[AudioCapture] delivery: {packets / seconds:F1} packets/s, " +
+                $"{1000.0 * samples / packets / SampleRate:F1} ms/packet, " +
+                $"effective rate {samples / seconds:F0} Hz (nominal {SampleRate})");
+        }
+    }
+
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
         Interlocked.Exchange(ref _lastDataAvailableUtcTicks, DateTime.UtcNow.Ticks);
@@ -150,6 +187,11 @@ public sealed class AudioCapture : IDisposable
 
         int channels = Math.Max(1, WaveFormat.Channels);
         float[] mono = DownmixToMono(e.Buffer, e.BytesRecorded, WaveFormat, channels);
+        if (mono.Length > 0)
+        {
+            Interlocked.Increment(ref _statsPackets);
+            Interlocked.Add(ref _statsSamples, mono.Length);
+        }
 
         lock (_bufferLock)
         {

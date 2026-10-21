@@ -687,3 +687,9 @@ parametric curve". Concretely, for Tier 1:
   Disco: duplicates 11/2202, 38-lag needle gone, tempo 96.7-97.4 from 10s, confidence up to
   0.75. The PNG/Catch/KLF tunings (bass weight, 3:2 rules, stickiness) were derived on the
   aliased signal and need live re-checks; the old dumps can't be re-used.
+- 2026-10-21 [worker] Capture latency: `Audio/LowLatencyLoopbackCapture.cs` subclasses NAudio's
+  `WasapiCapture` with a 20ms buffer + the Loopback stream flag (NAudio's loopback class is fixed
+  at 100ms and polls at half that). `AudioCapture` now logs delivery stats every 10s. Measured
+  on Disco: 19.7 packets/s @ 50.7 ms -> 86.5 packets/s @ 11.6 ms; effective sample rate stayed
+  47978-48192 Hz (no overruns/dropped audio). Tempo 96.7-97.6, locked within ~5s.
+  `BeatLeadSeconds` (0.05) was not re-tuned — true audio-to-screen latency needs a human check.
