@@ -308,7 +308,13 @@ public sealed class TempoTracker
                 _estimatesAtPeriod = 0;
             }
         }
-        _estimatesAtPeriod++;
+        // Only full-window estimates count toward a tempo being established: the early partial-
+        // window guesses are often off ("Disco" started at 130 = 4:3 of 97 for its first 4s),
+        // and shouldn't make the correct tempo wait the long established-switch delay.
+        if (_windowLength == HistoryTicks)
+        {
+            _estimatesAtPeriod++;
+        }
 
         // 3. Lock hysteresis.
         UpdateLock(bestAc);

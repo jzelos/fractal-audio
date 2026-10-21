@@ -268,9 +268,10 @@ fade rather than snap; waypoint jumps and zoom punches land on kicks, not hi-hat
 
 Recordings of these (SDL_DEMO_DUMP) can be scored with `tools/TempoReplay`; the dumps live
 outside the repo (they are tens of MB). Replay scores at `HEAD` (exact = within 3%, readings
-every 0.5s after 10s): Overdrive, Disco, Teardrop, Catch, PNG 98-100%; Hyperspeed 79% (misses
-are its half-time intro, corrected once the full beat enters); KLF 46% (riff-only intro reads
-79 until the kick enters — Catch, KLF and PNG dumps predate the audio-time framing fix).
+every 0.5s after 10s): Diesel Power, Overdrive, Disco, Teardrop, Catch, PNG 99-100%;
+Hyperspeed 79% (misses are its half-time intro, corrected once the full beat enters); KLF 46%
+(riff-only intro reads 79 until the kick enters — Catch, KLF and PNG dumps predate the
+audio-time framing fix).
 
 Re-check these live after any change to capture, analysis or `TempoTracker`. Status as of
 `842d612`, confirmed by the user on the overlay unless noted.
@@ -283,7 +284,8 @@ Re-check these live after any change to capture, analysis or `TempoTracker`. Sta
 | Lazerhawk — Overdrive | 133 | 133 | kick/snare alternation → half-tempo trap |
 | Future Sound of London — Papua New Guinea | 125 | 124 after ~175 at startup | two kicks per 2-beat cycle |
 | Massive Attack — Teardrop | 77 | 77 (offline, from a recording) | slow tempo; must not be doubled |
-| The Prodigy — Hyperspeed | 150 | 150 | fastest tested; octave rules must not halve/double it |
+| The Prodigy — Hyperspeed | 150 | 150; dropped to 75/120 until `22ed884` | half-time intro; 5-sixteenth acid riff (120) |
+| The Prodigy — Diesel Power | 106 | 144-149 until the bass term was dropped; replay now 106 | breakbeat; bass peaks at 53/132, kick dotted-8th (4:3 trap) |
 | Public Service Broadcasting — I Was Always Dreaming | unknown | never locks (conf 0.10-0.18) | low-confidence / "searching" path |
 
 ## AudioFrame contract (concrete)

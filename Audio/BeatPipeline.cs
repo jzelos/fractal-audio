@@ -23,18 +23,19 @@ public sealed class BeatPipeline
     // Grid beats fire this early to cover the analysis window plus about a frame of display latency.
     private const float BeatLeadSeconds = 0.05f;
 
-    // Tempo tracker input: full-band log-compressed flux plus half-weighted bass flux, each
-    // normalised by its own running mean. Bass alone failed on "Catch" (Kosheen, 130 BPM): its
-    // sustained bass line has ~no periodicity at the beat (ACF 0.07) while full-band log flux
-    // peaks exactly at 130 (0.57). Full-band alone failed the bass-carried "Papua New Guinea".
+    // Tempo tracker input: full-band log-compressed spectral flux, normalised by its running mean.
+    // Bass alone failed on "Catch" (Kosheen, 130 BPM): its sustained bass line has ~no
+    // periodicity at the beat. A half-weighted bass term was added for "Papua New Guinea", but
+    // that was tuned on the pre-audio-time-framing (aliased) signal; on clean recordings it only
+    // hurt — "Diesel Power" (Prodigy, 106 BPM), whose bass peaks at 53/132, read 0% with it and
+    // 100% without, with every other test recording unchanged (tools/TempoReplay). The bass
+    // flux is still passed to the tracker separately, as kick evidence for its octave/3:2 rules.
     private const float OnsetLogScale = 1000f;          // log1p(scale * magnitude) compression.
-    private const float TempoBassWeight = 0.5f;
     private const float OnsetMeanSeconds = 10f;         // running-mean time constant for normalisation.
 
     private readonly OnsetDetector _kickDetector = new(KickHistoryFrames, KickThresholdMultiplier, KickRefractoryFrames);
     private float[] _previousLogMagnitudes = Array.Empty<float>();
     private float _fullFluxMean;
-    private float _bassFluxMean;
     private int _onsetMeanFrames;
 
     public TempoTracker Tempo { get; } = new(FrameRate, BeatLeadSeconds);
@@ -51,12 +52,12 @@ public sealed class BeatPipeline
         (_, bool rawKick) = _kickDetector.Process(magnitudes.Slice(kickStart, kickEnd - kickStart));
         float bassFlux = _kickDetector.RawFlux;
 
-        float onset = OnsetStrength(magnitudes, bandStart[0], bandEnd[BandLayout.BandCount - 1], bassFlux);
+        float onset = OnsetStrength(magnitudes, bandStart[0], bandEnd[BandLayout.BandCount - 1]);
         bool gridBeat = Tempo.Process(onset, bassFlux);
         return (Tempo.Locked ? gridBeat : rawKick, rawKick);
     }
 
-    private float OnsetStrength(ReadOnlySpan<float> magnitudes, int start, int end, float bassFlux)
+    private float OnsetStrength(ReadOnlySpan<float> magnitudes, int start, int end)
     {
         if (_previousLogMagnitudes.Length < magnitudes.Length)
         {
@@ -76,13 +77,11 @@ public sealed class BeatPipeline
         }
 
         // Cumulative average until enough frames have passed, then the fixed time constant — so
-        // the means are right from the first frame rather than ramping up from zero.
+        // the mean is right from the first frame rather than ramping up from zero.
         _onsetMeanFrames++;
         float alpha = Math.Max(1f / (FrameRate * OnsetMeanSeconds), 1f / _onsetMeanFrames);
         _fullFluxMean += alpha * (fullFlux - _fullFluxMean);
-        _bassFluxMean += alpha * (bassFlux - _bassFluxMean);
 
-        return (fullFlux / Math.Max(_fullFluxMean, 1e-6f))
-            + (TempoBassWeight * bassFlux / Math.Max(_bassFluxMean, 1e-9f));
+        return fullFlux / Math.Max(_fullFluxMean, 1e-6f);
     }
 }
