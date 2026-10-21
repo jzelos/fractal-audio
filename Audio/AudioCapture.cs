@@ -252,6 +252,44 @@ public sealed class AudioCapture : IDisposable
         }
     }
 
+    /// <summary>Total mono samples captured so far — the audio-time clock the analyzer frames by.</summary>
+    public long TotalSamplesWritten
+    {
+        get
+        {
+            lock (_bufferLock)
+            {
+                return _totalSamplesWritten;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Copies the <paramref name="count"/> mono samples ending at absolute sample index
+    /// <paramref name="endSample"/> (exclusive) into <paramref name="destination"/>. Returns false
+    /// if those samples haven't all arrived yet or have already been overwritten. Samples before
+    /// the start of capture are zero-filled. Sample k lives at ring index k % capacity, since the
+    /// write position advances in lockstep with the total.
+    /// </summary>
+    public bool TryReadMonoEndingAt(long endSample, float[] destination, int count)
+    {
+        lock (_bufferLock)
+        {
+            if (endSample > _totalSamplesWritten || endSample - count < _totalSamplesWritten - _ringCapacity)
+            {
+                return false;
+            }
+
+            long start = endSample - count;
+            for (int i = 0; i < count; i++)
+            {
+                long k = start + i;
+                destination[i] = k < 0 ? 0f : _ringBuffer[k % _ringCapacity];
+            }
+            return true;
+        }
+    }
+
     public float ComputeRms(int sampleCount)
     {
         float[] window = new float[sampleCount];

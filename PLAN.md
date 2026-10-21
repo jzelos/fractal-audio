@@ -674,3 +674,16 @@ parametric curve". Concretely, for Tier 1:
   signal too. Offline full-tracker simulation: 100% of estimates right on all three dumps (KLF
   ~119, Catch ~130, PNG ~61). Live re-run read a steady 131.7 with the raw kick detector
   independently at 132/min — most likely a different track by then; KLF NOT re-verified live.
+- 2026-10-21 [worker] ROOT CAUSE found via "Disco" (Warpaint, 97 BPM), which locked at ~197 then
+  ~80: the analyzer framed by wall clock ("every 20ms, FFT the latest 2048 samples") but WASAPI
+  loopback delivers audio in ~50ms bursts (NAudio polls at half its 100ms buffer), so ~60% of
+  ticks re-analysed an identical window (verified on all dumps: 1352-1804 duplicate-spectrum
+  ticks per ~45-60s). The onset signal was effectively ~20Hz with jittered timing, and the
+  burst/tick aliasing (delivery pattern period 38 ticks) put a one-lag ACF needle at 79 BPM
+  into every recording — likely behind KLF's "79" too. All earlier tempo tuning was done on
+  that corrupted signal. Fix: `AudioAnalyzer` now frames by audio time — every 20ms hop of
+  captured samples is analysed exactly once, in order (`AudioCapture.TotalSamplesWritten` /
+  `TryReadMonoEndingAt`); wall-clock silent frames only while no audio arrives. Re-recorded
+  Disco: duplicates 11/2202, 38-lag needle gone, tempo 96.7-97.4 from 10s, confidence up to
+  0.75. The PNG/Catch/KLF tunings (bass weight, 3:2 rules, stickiness) were derived on the
+  aliased signal and need live re-checks; the old dumps can't be re-used.

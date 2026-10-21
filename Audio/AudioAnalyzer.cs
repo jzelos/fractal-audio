@@ -5,8 +5,8 @@ using NAudio.Dsp;
 namespace SDL_Demo.Audio;
 
 /// <summary>
-/// Pulls the most recent mono window from <see cref="AudioCapture"/>'s ring buffer on its own
-/// timer tick (decoupled from the capture callback — see PLAN.md's silence-timeout note), runs a
+/// Analyses <see cref="AudioCapture"/>'s mono stream in uniform audio-time frames (one per 20ms
+/// of captured samples — see <see cref="TickLoop"/>), on its own thread, and per frame runs a
 /// 2048-point Hann-windowed FFT via <c>NAudio.Dsp.FastFourierTransform.FFT</c>, bins into 7
 /// log-spaced-by-Hz-range bands computed from the capture's *actual* sample rate, computes
 /// RMS/peak/spectral centroid, runs a per-band <see cref="EnvelopeFollower"/>, runs
@@ -115,34 +115,68 @@ public sealed class AudioAnalyzer : IDisposable
         _thread?.Join(TimeSpan.FromSeconds(1));
     }
 
+    /// <summary>
+    /// Frames the analysis by audio time, not wall-clock time. WASAPI loopback delivers audio in
+    /// ~50ms bursts, so the old "every 20ms, analyse the latest 2048 samples" loop re-analysed an
+    /// identical window on ~60% of ticks and then jumped; the onset signal was effectively 20Hz
+    /// with irregular timing, and the 20ms/50ms aliasing produced a phantom ~79 BPM periodicity
+    /// that every tempo test track showed. Now every captured hop of samples (20ms of audio) is
+    /// analysed exactly once, in order, so downstream "ticks" are uniform audio-time frames.
+    /// While no audio arrives (silence timeout / no device), silent frames are produced on the
+    /// wall clock instead, so the visuals still decay to idle (WASAPI gotcha #1).
+    /// </summary>
     private void TickLoop()
     {
         var sw = Stopwatch.StartNew();
-        double nextTick = 0;
+        double lastSilentFrame = 0;
+        long nextFrameEnd = -1; // absolute sample index the next frame's window ends at.
 
         while (_running)
         {
-            Tick();
+            int sampleRate = _capture.SampleRate;
+            EnsureBandBinsFor(sampleRate);
+            int hop = Math.Max(1, (int)(sampleRate * TickIntervalSeconds));
 
-            nextTick += TickIntervalSeconds;
-            double remaining = nextTick - sw.Elapsed.TotalSeconds;
-            if (remaining > 0)
+            if (_capture.Status == CaptureStatus.Capturing)
             {
-                Thread.Sleep((int)(remaining * 1000));
+                long total = _capture.TotalSamplesWritten;
+
+                // (Re)sync on start, on resume after silence, or if we fell more than half a
+                // second behind — skip ahead rather than replaying stale audio.
+                if (nextFrameEnd < 0 || total - nextFrameEnd > sampleRate / 2)
+                {
+                    nextFrameEnd = total;
+                }
+
+                while (_running && nextFrameEnd <= total)
+                {
+                    if (_capture.TryReadMonoEndingAt(nextFrameEnd, _sampleWindow, FftSize))
+                    {
+                        AnalyzeWindow();
+                    }
+                    nextFrameEnd += hop;
+                }
+                lastSilentFrame = sw.Elapsed.TotalSeconds;
             }
             else
             {
-                // Fell behind — resync rather than busy-spinning to catch up.
-                nextTick = sw.Elapsed.TotalSeconds;
+                nextFrameEnd = -1;
+                double now = sw.Elapsed.TotalSeconds;
+                if (now - lastSilentFrame >= TickIntervalSeconds)
+                {
+                    lastSilentFrame = now;
+                    Array.Clear(_sampleWindow);
+                    AnalyzeWindow();
+                }
             }
+
+            Thread.Sleep(5);
         }
     }
 
-    private void Tick()
+    /// <summary>Analyses <see cref="_sampleWindow"/> (one frame) and publishes an AudioFrame.</summary>
+    private void AnalyzeWindow()
     {
-        EnsureBandBinsFor(_capture.SampleRate);
-
-        _capture.TryReadLatestMono(_sampleWindow, FftSize);
 
         double sumSquares = 0;
         float peak = 0f;
