@@ -636,3 +636,14 @@ parametric curve". Concretely, for Tier 1:
   fallback. Mapper changes shape every N locked beats (N = smallest power of 2 spanning 1.5s).
   Live C# runs locked at ~80 BPM (steady 0.75s grid) and ~109 BPM in later sections of the
   playback — whether those are the musically "right" beat is NOT verified (needs ears).
+- 2026-10-21 [worker] On-screen diagnostics (user request, pulls the IDEAS.md Tier 2 overlay
+  forward): `Graphics/TextOverlay.cs` (SDL_ttf lines -> ABGR8888 surfaces -> CPU-composited onto
+  a translucent panel -> one GL texture, drawn 1:1 via `shaders/overlay.*` on FullscreenQuad's
+  VAO; re-uploads only when text changes; disables itself with a console message if the font or
+  shaders fail). `Diagnostics/DiagnosticsPanel.cs` builds the text; `Diagnostics/TapTempo.cs`
+  gives a tapped-BPM ground truth and tracker/tap ratio (octave errors show as x2.00/x0.50).
+  `AudioFrame` gains `TempoConfidence`/`RawKickCount`; mapper exposes a read-only
+  `MapperDiagnostics` snapshot + normalised bands (it remains the only uniform writer). Keys:
+  D/F1 toggle, T/Space tap. Verified by screenshotting the live window: overlay renders,
+  updates, locked tempo shown. Tap input NOT verified live (injected keys didn't reach the
+  window).

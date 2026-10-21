@@ -1,5 +1,6 @@
 using SDL2;
 using SDL_Demo.Audio;
+using SDL_Demo.Diagnostics;
 using SDL_Demo.Graphics;
 using SDL_Demo.Mapping;
 using Silk.NET.OpenGL;
@@ -26,10 +27,17 @@ public sealed class App
     private AudioAnalyzer? _audioAnalyzer;
     private AudioFrameBus? _audioFrameBus;
     private AudioToFractalMapper? _mapper;
+    private TextOverlay? _overlay;
+    private readonly DiagnosticsPanel _diagnostics = new();
+    private readonly TapTempo _tapTempo = new();
+    private bool _overlayVisible = true;
     private bool _running = true;
     private double _lastFrameTimeLogSeconds;
 
     private static readonly string ShaderDirectory = Path.Combine(AppContext.BaseDirectory, "shaders");
+    private static readonly string OverlayFontPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "consola.ttf");
+    private const int OverlayFontPointSize = 13;
 
     public int Run()
     {
@@ -65,6 +73,7 @@ public sealed class App
 
         _quad = new FullscreenQuad(_gl);
         _palette = new PaletteTexture(_gl);
+        _overlay = TextOverlay.TryCreate(_gl, OverlayFontPath, OverlayFontPointSize, ShaderDirectory);
 
         _shaderReloader = new ShaderHotReloader(
             _gl,
@@ -108,6 +117,20 @@ public sealed class App
             {
                 case SDL.SDL_EventType.SDL_QUIT:
                     _running = false;
+                    break;
+
+                case SDL.SDL_EventType.SDL_KEYDOWN when e.key.repeat == 0:
+                    switch (e.key.keysym.sym)
+                    {
+                        case SDL.SDL_Keycode.SDLK_d:
+                        case SDL.SDL_Keycode.SDLK_F1:
+                            _overlayVisible = !_overlayVisible;
+                            break;
+                        case SDL.SDL_Keycode.SDLK_t:
+                        case SDL.SDL_Keycode.SDLK_SPACE:
+                            _tapTempo.Tap(_clock.ElapsedSeconds);
+                            break;
+                    }
                     break;
 
                 case SDL.SDL_EventType.SDL_WINDOWEVENT:
@@ -165,6 +188,14 @@ public sealed class App
 
         _quad.Draw();
 
+        // Diagnostics overlay: reads the frame + mapper state, never writes fractal uniforms.
+        if (_overlayVisible && _overlay != null)
+        {
+            _overlay.SetLines(_diagnostics.Build(
+                frame, _mapper, _tapTempo, now, _clock.RollingAverageFrameTimeSeconds));
+            _overlay.Draw(_quad, _window.Width, _window.Height);
+        }
+
         SDL.SDL_GL_SwapWindow(_window.Handle);
     }
 
@@ -184,6 +215,7 @@ public sealed class App
         // down the GL context/window/SDL itself last.
         _quad?.Dispose();
         _palette?.Dispose();
+        _overlay?.Dispose();
         _shaderReloader?.Dispose();
 
         _audioAnalyzer?.Dispose();

@@ -26,6 +26,8 @@ public sealed class AudioFrame
         TempoLocked = false,
         TempoBpm = 0f,
         BeatPhase = 0f,
+        TempoConfidence = 0f,
+        RawKickCount = 0,
         BandEnergies = ImmutableArray.Create(0f, 0f, 0f, 0f, 0f, 0f, 0f),
         BandEnergiesRaw = ImmutableArray.Create(0f, 0f, 0f, 0f, 0f, 0f, 0f),
     };
@@ -51,6 +53,11 @@ public sealed class AudioFrame
     public required bool TempoLocked { get; init; }   // TempoTracker has a confident tempo + phase
     public required float TempoBpm { get; init; }     // current estimate; 0 before the first one
     public required float BeatPhase { get; init; }    // 0 at a beat, rising toward 1 before the next
+    public required float TempoConfidence { get; init; } // normalised autocorrelation at the tempo lag
+
+    // Monotonic count of the raw bass-band detector's kicks, whether or not the tempo is locked —
+    // diagnostics only, to compare the grid against what the detector actually hears.
+    public required long RawKickCount { get; init; }
     public required ImmutableArray<float> BandEnergies { get; init; }      // 7, post-envelope
     public required ImmutableArray<float> BandEnergiesRaw { get; init; }   // 7, pre-envelope (debug)
 }

@@ -162,7 +162,11 @@ beat. All four are traceable to specific code, not vague polish — see each ite
   and makes beats smear into visible energy. Highest value-to-effort item in Tier 2 by a wide margin.
   · effort: medium · risk: needs FBO ping-pong + float texture; decay factor must be audio-independent or
   the frame saturates to white
-- **Debug/analysis overlay: spectrum bars, per-band envelopes, flux + threshold, detected BPM, FPS,
+- *(Mostly done 2026-10-21: text overlay via SDL_ttf — tempo/lock/confidence, tap-tempo
+  comparison, beat phase, grid-beat vs raw-kick flashes, capture status, normalised band levels,
+  Julia/zoom/palette state, frame time; D toggles. Graphical spectrum bars/flux-vs-threshold plot
+  still open.)*
+  **Debug/analysis overlay: spectrum bars, per-band envelopes, flux + threshold, detected BPM, FPS,
   capture status** — [grounded, and `SDL2_ttf` is already in `bin/`] You cannot tune audio mappings blind.
   Treat this as a development instrument, toggled with a key. · effort: small · risk: drawing it over a GL
   context means either an ImGui backend or a simple GL text/quad path (SDL_Renderer and GL don't mix)

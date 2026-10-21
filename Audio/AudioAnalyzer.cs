@@ -51,6 +51,7 @@ public sealed class AudioAnalyzer : IDisposable
     private readonly TempoTracker _tempo = new((float)(1.0 / TickIntervalSeconds), BeatLeadSeconds);
     private long _onsetCount;
     private long _beatCount;
+    private long _rawKickCount;
 
     private readonly float[] _sampleWindow = new float[FftSize];
     private readonly Complex[] _fftBuffer = new Complex[FftSize];
@@ -216,6 +217,10 @@ public sealed class AudioAnalyzer : IDisposable
         {
             _beatCount++;
         }
+        if (rawBeat)
+        {
+            _rawKickCount++;
+        }
 
         bool isSilent = _capture.Status != CaptureStatus.Capturing;
 
@@ -235,6 +240,8 @@ public sealed class AudioAnalyzer : IDisposable
             TempoLocked = _tempo.Locked,
             TempoBpm = _tempo.Bpm,
             BeatPhase = _tempo.Phase,
+            TempoConfidence = _tempo.Confidence,
+            RawKickCount = _rawKickCount,
             BandEnergies = bandEnergies.MoveToImmutable(),
             BandEnergiesRaw = bandEnergiesRaw.MoveToImmutable(),
         };
@@ -282,7 +289,7 @@ public sealed class AudioAnalyzer : IDisposable
         Console.WriteLine(
             $"[AudioAnalyzer] status={frame.Status} rms={frame.Rms:F4} centroid01={frame.SpectralCentroid01:F3} " +
             $"flux={frame.Flux:F3} onsets={frame.OnsetCount} beats={frame.BeatCount} " +
-            $"tempo={frame.TempoBpm:F1}bpm locked={frame.TempoLocked} conf={_tempo.Confidence:F2} bands=[{bands}]");
+            $"tempo={frame.TempoBpm:F1}bpm locked={frame.TempoLocked} conf={frame.TempoConfidence:F2} bands=[{bands}]");
     }
 
     public void Dispose()

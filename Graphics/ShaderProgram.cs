@@ -101,6 +101,15 @@ public sealed class ShaderProgram : IDisposable
         }
     }
 
+    public void SetUniform4f(string name, float x, float y, float z, float w)
+    {
+        int location = _gl.GetUniformLocation(Handle, name);
+        if (location >= 0)
+        {
+            _gl.Uniform4(location, x, y, z, w);
+        }
+    }
+
     public void Dispose()
     {
         if (Handle != 0)

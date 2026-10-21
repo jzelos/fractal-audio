@@ -3,6 +3,10 @@ using SDL_Demo.Graphics;
 
 namespace SDL_Demo.Mapping;
 
+public readonly record struct MapperDiagnostics(
+    float Cx, float Cy, int Waypoint, int WaypointCount, float Zoom, float FitZoom,
+    int PaletteFrom, int PaletteTo, float PaletteBlend);
+
 /// <summary>
 /// The one and only place that reads <see cref="AudioFrame"/> and writes the fractal shader's
 /// uniforms + palette state. This is a deliberate design guard (see PLAN.md "Palette +
@@ -134,6 +138,15 @@ public sealed class AudioToFractalMapper
 
     public int PaletteCount { get; }
 
+    /// <summary>Read-only snapshot of what the last <see cref="Apply"/> wrote, for the on-screen
+    /// diagnostics overlay. Reading it never affects the mapping.</summary>
+    public MapperDiagnostics Diagnostics { get; private set; }
+
+    /// <summary>AGC-normalised band levels (0..1) from the last <see cref="Apply"/>.</summary>
+    public ReadOnlySpan<float> NormalizedBands => _normalizedBands;
+
+    private readonly float[] _normalizedBands = new float[AudioFrame.Empty.BandEnergies.Length];
+
     /// <summary>Reads the latest audio frame and writes every fractal uniform for this render
     /// frame. Call exactly once per frame, on the render thread.</summary>
     public void Apply(ShaderProgram program, AudioFrame frame, double nowSeconds, double dtSeconds, int widthPx, int heightPx)
@@ -262,6 +275,11 @@ public sealed class AudioToFractalMapper
         program.SetUniform1i("u_paletteFrom", _paletteFrom);
         program.SetUniform1i("u_paletteTo", _paletteTo);
         program.SetUniform1f("u_paletteBlend", paletteBlend);
+
+        bands.CopyTo(_normalizedBands);
+        Diagnostics = new MapperDiagnostics(
+            cx, cy, _targetWaypointIndex, Waypoints.Length, zoom, _fitZoom,
+            _paletteFrom, _paletteTo, paletteBlend);
     }
 
     private static int BeatsPerWaypoint(float bpm)
