@@ -52,6 +52,16 @@ public sealed class TempoTracker
     // DottedRatio x the riff's score. Offline on all three dumps: 100% of estimates right.
     private const float DottedRatio = 0.5f;
     private const float MinBassSupport = 0.2f;
+
+    // Half-tempo correction. "Overdrive" (Lazerhawk, 133 BPM) locked at 66.5: with alternating
+    // kick/snare the onset signal repeats more exactly every two beats, so autocorrelation
+    // prefers the slower octave — and fold sharpness can't tell either, since folding at twice
+    // the period just gives two equal peaks with the same peak/mean. The kick fold's *shape*
+    // can: if it has a second peak half a cycle after the main one, nearly as tall, the kick is
+    // landing twice per "beat" and the real tempo is double. Measured half-cycle ratios:
+    // Overdrive 0.80 (-> doubled, exact 133), Disco 0.17-0.52, Teardrop 0.16-0.29 (unchanged).
+    private const float HalfCycleKickRatio = 0.6f;
+    private const float MinBassFoldSharpness = 2.0f; // bass must have a clear beat to be trusted.
     private const float PhaseGain = 0.3f;
     private const float MaxPhaseCorrection = 0.05f; // cycles per estimate.
     private const float BigPhaseError = 0.25f;
@@ -226,6 +236,12 @@ public sealed class TempoTracker
             }
         }
 
+        // Half-tempo check on the kick's fold shape (see HalfCycleKickRatio).
+        if (estimate / 2f >= minLag && KickLandsOnHalfCycle(estimate))
+        {
+            estimate /= 2f;
+        }
+
         if (_period <= 0f)
         {
             _period = estimate;
@@ -343,9 +359,46 @@ public sealed class TempoTracker
         }
     }
 
-    /// <summary>Folds the window at <paramref name="period"/> ticks into <see cref="_fold"/>
-    /// (bin k = k/FoldBins of a cycle before the window's end) and returns peak/mean.</summary>
-    private float FoldSharpness(float period)
+    /// <summary>True when the bass (kick) fold at <paramref name="period"/> is clearly beat-like
+    /// and has a second peak half a cycle from its main one at least HalfCycleKickRatio as tall
+    /// — i.e. the real beat is twice as fast.</summary>
+    private bool KickLandsOnHalfCycle(float period)
+    {
+        float sharpness = FoldSharpness(period, _bassWindow);
+        if (sharpness < MinBassFoldSharpness)
+        {
+            return false;
+        }
+
+        int peak = 0;
+        for (int k = 1; k < FoldBins; k++)
+        {
+            if (_fold[k] > _fold[peak])
+            {
+                peak = k;
+            }
+        }
+        if (_fold[peak] <= 0f)
+        {
+            return false;
+        }
+
+        float half = 0f;
+        for (int d = -1; d <= 1; d++)
+        {
+            half = Math.Max(half, _fold[(peak + (FoldBins / 2) + d + FoldBins) % FoldBins]);
+        }
+        return half / _fold[peak] >= HalfCycleKickRatio;
+    }
+
+    /// <summary>Folds the tempo-signal window at <paramref name="period"/> ticks into
+    /// <see cref="_fold"/> and returns peak/mean.</summary>
+    private float FoldSharpness(float period) => FoldSharpness(period, _window);
+
+    /// <summary>Folds <paramref name="source"/> (the current window's samples) at
+    /// <paramref name="period"/> ticks into <see cref="_fold"/> (bin k = k/FoldBins of a cycle
+    /// before the window's end) and returns peak/mean.</summary>
+    private float FoldSharpness(float period, float[] source)
     {
         Array.Clear(_fold);
         Array.Clear(_foldCount);
@@ -353,7 +406,7 @@ public sealed class TempoTracker
         {
             float age = (_windowLength - 1 - i) % period;
             int k = (int)(age / period * FoldBins) % FoldBins;
-            _fold[k] += _window[i];
+            _fold[k] += source[i];
             _foldCount[k]++;
         }
 

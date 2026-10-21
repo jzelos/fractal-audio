@@ -693,3 +693,15 @@ parametric curve". Concretely, for Tier 1:
   on Disco: 19.7 packets/s @ 50.7 ms -> 86.5 packets/s @ 11.6 ms; effective sample rate stayed
   47978-48192 Hz (no overruns/dropped audio). Tempo 96.7-97.6, locked within ~5s.
   `BeatLeadSeconds` (0.05) was not re-tuned — true audio-to-screen latency needs a human check.
+- 2026-10-21 [worker] "Overdrive" (Lazerhawk, 133 BPM) locked at 66.5 (conf 0.8): half-tempo
+  octave error. Clean 60s dump (temporary): fold sharpness can't detect it (folding at 2x the
+  period gives two equal peaks, same peak/mean), and ACF prefers the slower octave (kick/snare
+  alternation repeats more exactly every 2 beats). Discriminator: the bass (kick) fold *shape* —
+  a second peak half a cycle from the main one at >= 0.6 of it, with bass fold sharpness >= 2,
+  means the kick lands twice per "beat" → halve the period. Half-cycle ratios: Overdrive 0.80,
+  Disco 0.17-0.52, Teardrop (77 BPM, recorded by accident) 0.16-0.29. Offline full-tracker
+  simulation, exact-tempo metric: Overdrive 0 -> 104/104; Disco, Teardrop, Catch, KLF unchanged
+  (all 100%). Papua New Guinea (old aliased dump) moves 61.3 -> ~122.6 — its kicks do fall every
+  0.49s and "61" was never ground truth, so possibly a fix; unverified. Live check of Overdrive
+  missed (track had changed); a live run on an unknown-BPM track stayed unlocked at conf
+  0.10-0.18 ("searching", raw-detector beats), as designed.
