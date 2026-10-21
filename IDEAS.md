@@ -178,7 +178,9 @@ beat. All four are traceable to specific code, not vague polish — see each ite
   beat-synced auto-advance** — [grounded] projectM's value is its preset library, not its renderer. Once
   presets are data, every mapping experiment is permanent instead of a recompile. · effort: medium
   · risk: schema churn early on; version the files
-- **Tempo estimate (autocorrelation over the flux history) and beat-phase-locked parameter LFOs**
+- *(Tempo-estimate half done 2026-10-21: `Audio/TempoTracker.cs`, exposing `TempoBpm`/`BeatPhase`
+  on `AudioFrame` — see PLAN.md Phase 9 log. Phase-locked LFOs driven by `BeatPhase` still open.)*
+  **Tempo estimate (autocorrelation over the flux history) and beat-phase-locked parameter LFOs**
   — [grounded] Level-driven motion always lags the beat; phase-locked LFOs let zoom/rotation *anticipate* it,
   which reads as musicality rather than reaction. · effort: medium · risk: tempo estimation is unreliable on
   rubato/ambient material — needs a confidence value and graceful fallback to level-driven motion
