@@ -66,14 +66,28 @@ public sealed class TempoTracker
     // the period just gives two equal peaks with the same peak/mean. The kick fold's *shape*
     // can: if it has a second peak half a cycle after the main one, nearly as tall, the kick is
     // landing twice per "beat" and the real tempo is double. Measured half-cycle ratios:
-    // Overdrive 0.80 (-> doubled, exact 133), Disco 0.17-0.52, Teardrop 0.16-0.29 (unchanged).
-    private const float HalfCycleKickRatio = 0.6f;
+    // Overdrive 0.80 (-> doubled, exact 133), Disco 0.17-0.52. Raised from 0.6: "Teardrop"
+    // (77 BPM) sits at a median 0.60 through its main section; every test recording that needs
+    // doubling has a median of at least 0.73.
+    private const float HalfCycleKickRatio = 0.7f;
     private const float MinBassFoldSharpness = 2.0f; // bass must have a clear beat to be trusted.
     // A near-equal half-cycle kick is strong enough evidence on its own to accept a less sharp
     // fold: "Hyperspeed" (Prodigy, 150 BPM) dropped to 75 in its heavy breakbeat sections, where
     // the spread-out kick pattern folds at only 1.8-1.9 sharpness but with ratios of 0.94-0.98.
     private const float StrongHalfCycleKickRatio = 0.85f;
     private const float MinBassFoldSharpnessStrong = 1.6f;
+    // The kick fold can't settle the octave alone: a kick on every 8th note gives the slow octave
+    // a near-equal half-cycle peak too. "Teardrop" (77 BPM) doubled on half-cycle ratios of
+    // 0.6-0.76. What separates it is the full-band onset signal: where the doubled tempo is real,
+    // it correlates at the half period nearly as well as at the full one (median ratio >= 0.58
+    // on every test recording that needs doubling; Teardrop's is 0.38). So the ordinary rule
+    // also needs this much onset ACF at the half period. The strong rule doesn't: in the
+    // half-time sections of "The Dark" (Tiefundton, 145 BPM) the onset signal has no 145 pulse
+    // at all (ACF 0.01) while the kick still lands evenly twice per cycle (ratio 0.99). Neither
+    // rule doubles past MaxDoubledBpm: "Anvil" (LORN, 100 BPM) has steady 8th-note kicks
+    // (ratios 0.80-0.98) and enough onset support in places, and read 200.
+    private const float MinHalfPeriodAcRatio = 0.5f;
+    private const float MaxDoubledBpm = 160f;
     private const float PhaseGain = 0.3f;
     private const float MaxPhaseCorrection = 0.05f; // cycles per estimate.
     private const float BigPhaseError = 0.25f;
@@ -98,6 +112,7 @@ public sealed class TempoTracker
     private float _lastKickRatio;     // trace only.
 
     private float _period;       // in ticks; 0 until the first estimate.
+    private bool _periodOnlyDoubled; // _period has only ever come from halved estimates (the half-cycle rule).
     private float _phase;        // cycle fraction elapsed since the last beat.
     private bool _reseedPhase = true;
     private int _lowConfidenceCount;
@@ -261,6 +276,7 @@ public sealed class TempoTracker
         // Half-tempo check on the kick's fold shape (see HalfCycleKickRatio).
         float refined = estimate;
         bool halved = estimate / 2f >= minLag && KickLandsOnHalfCycle(estimate);
+        float acHalf = AcNear(refined / 2f); // trace only.
         if (halved)
         {
             estimate /= 2f;
@@ -271,7 +287,7 @@ public sealed class TempoTracker
             float Bpm(float lag) => 60f * _tickRate / lag;
             LastTrace = $"acf best {Bpm(acBestLag):F0} (ac {_lagAc[acBestLag]:F2})" +
                 $"{(promoted ? " promoted3:2" : string.Empty)} -> lag {Bpm(bestLag):F0} (ac {_lagAc[bestLag]:F2})" +
-                $" refined {Bpm(refined):F1} kick sharp {_lastKickSharpness:F2} ratio {_lastKickRatio:F2}" +
+                $" refined {Bpm(refined):F1} acHalf {acHalf:F2}/{AcNear(refined):F2} kick sharp {_lastKickSharpness:F2} ratio {_lastKickRatio:F2}" +
                 $"{(halved ? " HALVED" : string.Empty)} => est {Bpm(estimate):F1}" +
                 $" | period {(_period > 0 ? Bpm(_period) : 0f):F1} pending {_pendingPeriods.Count}";
         }
@@ -279,21 +295,29 @@ public sealed class TempoTracker
         if (_period <= 0f)
         {
             _period = estimate;
+            _periodOnlyDoubled = halved;
             _estimatesAtPeriod = 0;
         }
         else if (MathF.Abs((estimate / _period) - 1f) <= TempoChangeTolerance)
         {
             _period += PeriodSmoothing * (estimate - _period);
+            _periodOnlyDoubled &= halved;
             _pendingPeriods.Clear();
         }
         else
         {
             // A different tempo, or an octave error: only switch once it persists — for much
-            // longer once the current tempo is established, unless it's a kick-backed up-octave
-            // correction.
-            // Kick-backed corrections: the half-cycle up-octave fix, or a 3:2 promotion.
-            bool kickBackedFix = (halved && MathF.Abs((estimate / _period) - 0.5f) <= TempoChangeTolerance)
-                || promoted;
+            // longer once the current tempo is established, except for these.
+            // Fast: the half-cycle rule doubling the current tempo, or undoing a doubling it
+            // made — undoing used to count as a tempo change, so with "Teardrop"'s kick evidence
+            // flapping estimate to estimate, a doubling was only undone after 10s of agreement.
+            // A tempo the autocorrelation measured directly keeps the slow switch against its
+            // own slower octave: "The Dark" (145 BPM) has a half-time section with no 145 pulse
+            // in the onset signal at all. Also fast: a kick-backed 3:2 promotion.
+            bool octaveFlip = halved
+                ? MathF.Abs((refined / _period) - 1f) <= TempoChangeTolerance
+                : _periodOnlyDoubled && MathF.Abs((estimate / _period) - 2f) <= 2f * TempoChangeTolerance;
+            bool kickBackedFix = octaveFlip || promoted;
             int persist = kickBackedFix || _estimatesAtPeriod < EstablishedAfterEstimates
                 ? TempoChangePersist
                 : EstablishedTempoChangePersist;
@@ -303,6 +327,7 @@ public sealed class TempoTracker
             if (_pendingPeriods.Count >= persist)
             {
                 _period = estimate;
+                _periodOnlyDoubled = halved;
                 _pendingPeriods.Clear();
                 _reseedPhase = true;
                 _estimatesAtPeriod = 0;
@@ -372,6 +397,23 @@ public sealed class TempoTracker
         return best;
     }
 
+    /// <summary>The onset autocorrelation at the integer lags either side of a fractional
+    /// <paramref name="lag"/> (the larger); lags outside the computed range count as 0.</summary>
+    private float AcNear(float lag)
+    {
+        int minLag = (int)(60f * _tickRate / MaxBpm);
+        int maxLag = (int)(60f * _tickRate / MinBpm);
+        float best = 0f;
+        for (int l = (int)MathF.Floor(lag); l <= (int)MathF.Ceiling(lag); l++)
+        {
+            if (l >= minLag && l <= maxLag)
+            {
+                best = Math.Max(best, _lagAc[l]);
+            }
+        }
+        return best;
+    }
+
     /// <summary>Normalised autocorrelation of the bass onset signal over the current window.</summary>
     private float BassAutocorrelation(int lag, int n)
     {
@@ -412,9 +454,10 @@ public sealed class TempoTracker
         }
     }
 
-    /// <summary>True when the bass (kick) fold at <paramref name="period"/> is clearly beat-like
-    /// and has a second peak half a cycle from its main one at least HalfCycleKickRatio as tall
-    /// — i.e. the real beat is twice as fast.</summary>
+    /// <summary>True when the beat looks twice as fast as <paramref name="period"/>: the bass
+    /// (kick) fold is clearly beat-like and has a second peak half a cycle from its main one at
+    /// least HalfCycleKickRatio as tall, backed by the onset signal (MinHalfPeriodAcRatio) — or
+    /// a near-equal peak, if the doubled tempo is no faster than MaxDoubledBpm.</summary>
     private bool KickLandsOnHalfCycle(float period)
     {
         float sharpness = FoldSharpness(period, _bassWindow);
@@ -445,9 +488,10 @@ public sealed class TempoTracker
         }
         float ratio = half / _fold[peak];
         _lastKickRatio = ratio;
-        return sharpness >= MinBassFoldSharpness
-            ? ratio >= HalfCycleKickRatio
-            : ratio >= StrongHalfCycleKickRatio;
+        bool strong = ratio >= StrongHalfCycleKickRatio;
+        bool ordinary = sharpness >= MinBassFoldSharpness && ratio >= HalfCycleKickRatio
+            && AcNear(period / 2f) >= MinHalfPeriodAcRatio * AcNear(period);
+        return (strong || ordinary) && 120f * _tickRate / period <= MaxDoubledBpm;
     }
 
     /// <summary>Folds the tempo-signal window at <paramref name="period"/> ticks into
