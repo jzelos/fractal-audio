@@ -22,6 +22,17 @@ Use these names, so the replay command below works as-is:
 | `teardrop.csv` | Massive Attack — Teardrop | 77 |
 | `hyperspeed.csv` | The Prodigy — Hyperspeed | 150 |
 | `diesel.csv` | The Prodigy — Diesel Power | 106 |
+| `learningtofly.csv` | Maceo Plex - Learning to fly  | 122 |
+| `dark.csv` | Tiefundton - The Dark  | 145 |
+| `researchchemicals.csv` | Viagra Boys - Research Chemicals  | 137 |
+| `blacksheep.csv` | Scott Pilgrim Vs. The World - Black Sheep  | 124 |
+| `anvil.csv` | LORN - ANVIL  | 100 |
+| `acidrain.csv` | Lorn - Acid Rain  | 56 |
+| `starburster.csv` | Fontaines D.C. - Starburster | 98 |
+| `heyboyheygirl.csv` | The Chemical Brothers - Hey Boy Hey Girl | 127 |
+| `reflektor.csv` | Arcade Fire - Reflektor | 112 |
+| `gosh.csv` | Jamie xx - Gosh | 139 |
+| `kissme.csv` | Artemas - i like the way you kiss me | 152 |
 
 Score them all against the current tracker (skip any you haven't recorded):
 
