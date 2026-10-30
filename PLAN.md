@@ -747,3 +747,7 @@ parametric curve". Concretely, for Tier 1:
   smoothed pulse peaks on the beat instead of ~40ms after it and carries no analyzer/render frame
   jitter. Unlocked, the event-driven pulse is unchanged. Build clean; 30s smoke run clean, but the
   live audio never locked, so the phase path is NOT verified live.
+- 2026-10-30 [worker] Beat sync, shape glide: while locked, a waypoint glide lasts the whole
+  number of beats nearest 0.9s (at least 1, at most the beats between changes), so the morph
+  starts and settles on grid beats; unlocked it stays 0.9s. Build clean; 15s smoke run clean
+  (unlocked audio only).

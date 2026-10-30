@@ -59,7 +59,7 @@ public sealed class AudioToFractalMapper
 
     // Phase 9 starting values (PLAN.md) — all tune-by-eye, not derived.
     private const float PerturbRadius = 0.12f;         // continuous `c` perturbation bound (was 0.05 — too small to read as shape change).
-    private const float GlideSeconds = 0.9f;           // beat-triggered waypoint glide; ease-out, so motion starts on the beat.
+    private const float GlideSeconds = 0.9f;           // beat-triggered waypoint glide (locked: rounded to whole beats).
     private const float MinWaypointHoldSeconds = 1.5f; // beats inside this window punch the zoom but don't change shape.
     private const float PaletteRotationSpeed = 0.6f;   // palette-phase units/sec at Rms == 1.
     private const float PaletteFadeSeconds = 1.5f;     // palette crossfade duration.
@@ -109,6 +109,7 @@ public sealed class AudioToFractalMapper
     private (float X, float Y) _glideFromC;
     private (float X, float Y) _baseC;
     private double _glideStartSeconds = -1;
+    private float _glideSeconds = GlideSeconds;
     private float _perturbX;
     private float _perturbY;
 
@@ -183,9 +184,14 @@ public sealed class AudioToFractalMapper
             if (locked)
             {
                 _gridBeats++;
-                if (_gridBeats % BeatsSpanning(frame.TempoBpm, MinWaypointHoldSeconds) == 0)
+                int beatsPerWaypoint = BeatsSpanning(frame.TempoBpm, MinWaypointHoldSeconds);
+                if (_gridBeats % beatsPerWaypoint == 0)
                 {
-                    AdvanceWaypoint(nowSeconds);
+                    // Glide for a whole number of beats nearest GlideSeconds, so the morph
+                    // settles on a beat (and always before the next change).
+                    float beatSeconds = 60f / frame.TempoBpm;
+                    int glideBeats = Math.Clamp((int)MathF.Round(GlideSeconds / beatSeconds), 1, beatsPerWaypoint);
+                    AdvanceWaypoint(nowSeconds, glideBeats * beatSeconds);
                 }
                 // The fade check only matters when the tempo has just locked after an
                 // onset-driven change: never cut a crossfade short.
@@ -197,7 +203,7 @@ public sealed class AudioToFractalMapper
             }
             else if (nowSeconds - _waypointChangeSeconds >= MinWaypointHoldSeconds)
             {
-                AdvanceWaypoint(nowSeconds);
+                AdvanceWaypoint(nowSeconds, GlideSeconds);
             }
         }
 
@@ -230,7 +236,7 @@ public sealed class AudioToFractalMapper
         (float targetBaseX, float targetBaseY) = Waypoints[_targetWaypointIndex];
         float glideT = _glideStartSeconds < 0
             ? 1f
-            : (float)Math.Clamp((nowSeconds - _glideStartSeconds) / GlideSeconds, 0.0, 1.0);
+            : (float)Math.Clamp((nowSeconds - _glideStartSeconds) / _glideSeconds, 0.0, 1.0);
         float easedT = SmoothStep(glideT);
         _baseC = (Lerp(_glideFromC.X, targetBaseX, easedT), Lerp(_glideFromC.Y, targetBaseY, easedT));
 
@@ -328,8 +334,9 @@ public sealed class AudioToFractalMapper
         return untilBeat <= BeatPulseAttackSeconds ? 1f : MathF.Exp(-sinceBeat / BeatPulseDecaySeconds);
     }
 
-    private void AdvanceWaypoint(double nowSeconds)
+    private void AdvanceWaypoint(double nowSeconds, float glideSeconds)
     {
+        _glideSeconds = glideSeconds;
         _glideFromC = _baseC;
         _targetWaypointIndex = (_targetWaypointIndex + 1) % Waypoints.Length;
         _glideStartSeconds = nowSeconds;
