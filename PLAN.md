@@ -458,6 +458,8 @@ parametric curve". Concretely, for Tier 1:
 - [ ] (Phase 9) Julia shape visibly morphs with the music, not just the camera.
 - [ ] (Phase 9) Palette changes crossfade; no instant full-palette swaps.
 - [ ] (Phase 9) Waypoint jumps/zoom punches track kicks rather than every transient.
+- [ ] (Phase 9) On a track that locks, palette fades and shape changes start on the beat and the
+      zoom punch peaks on it (not after it).
 
 ## Change log
 - 2026-10-21 14:00 [planner] Created plan. Verified csproj bug, Program.cs contents, and

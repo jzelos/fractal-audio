@@ -23,7 +23,11 @@ art found) or [speculative] (plausible, unverified for this codebase).
 ### Tier 1 fixes — first playtest feedback (2026-10-21, highest priority — do before any Tier 2 item)
 
 > **Status:** all four items below implemented as PLAN.md Phase 9 (2026-10-21) — awaiting a second
-> playtest before moving to Done. Item (c), full BPM/phase-lock, was not attempted (stays Tier 2).
+> playtest before moving to Done. Item (c) was then pulled forward too: `Audio/TempoTracker.cs`
+> (tempo + phase lock, scored against known-BPM tracks with `tools/TempoReplay`), and as of
+> 2026-10-30, while locked, palette fades and shape glides start on grid beats, glides last whole
+> beats, and the zoom punch is driven by beat phase so it peaks on the beat. Still needs a playtest
+> on a track that locks.
 
 User ran the app with real music and reported: (1) a coloured background with a black silhouette in
 the centre that gradually grows, (2) background colour changes that seem to track the audio but
@@ -183,7 +187,8 @@ beat. All four are traceable to specific code, not vague polish — see each ite
   presets are data, every mapping experiment is permanent instead of a recompile. · effort: medium
   · risk: schema churn early on; version the files
 - *(Tempo-estimate half done 2026-10-21: `Audio/TempoTracker.cs`, exposing `TempoBpm`/`BeatPhase`
-  on `AudioFrame` — see PLAN.md Phase 9 log. Phase-locked LFOs driven by `BeatPhase` still open.)*
+  on `AudioFrame` — see PLAN.md Phase 9 log. First phase-locked LFO done 2026-10-30: the zoom
+  punch follows `BeatPhase` while locked. Further LFOs (rotation, palette phase) still open.)*
   **Tempo estimate (autocorrelation over the flux history) and beat-phase-locked parameter LFOs**
   — [grounded] Level-driven motion always lags the beat; phase-locked LFOs let zoom/rotation *anticipate* it,
   which reads as musicality rather than reaction. · effort: medium · risk: tempo estimation is unreliable on
@@ -289,3 +294,5 @@ unverified pending exactly this kind of check, so this is the expected next loop
   (`Audio/OnsetDetector.cs`). Recommended next step: a PLAN.md "Phase 9" scoped to these four items.
 - 2026-10-21 [worker] Implemented the four "Tier 1 fixes" as PLAN.md Phase 9; marked them
   awaiting re-playtest (line numbers cited above refer to the pre-Phase-9 code).
+- 2026-10-30 [worker] Project renamed `SDL_Demo` -> `fractal-audio`. Tier 1 fix #4: discrete
+  changes and the zoom punch now follow the tempo grid while locked (see PLAN.md change log).
