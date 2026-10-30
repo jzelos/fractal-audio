@@ -5,7 +5,8 @@ namespace FractalAudio;
 /// <summary>
 /// Wraps SDL window creation/lifetime. Sets the SDL_GL_* context attributes *before*
 /// SDL_CreateWindow (SDL requires this ordering) and creates the window with the
-/// SDL_WINDOW_OPENGL flag so a GL context can be created against it.
+/// SDL_WINDOW_OPENGL flag so a GL context can be created against it. The window is resizable and
+/// maximisable; <see cref="Width"/>/<see cref="Height"/> are the GL drawable size in pixels.
 /// </summary>
 public sealed class Window
 {
@@ -31,7 +32,8 @@ public sealed class Window
             SDL.SDL_WINDOWPOS_UNDEFINED,
             width,
             height,
-            SDL.SDL_WindowFlags.SDL_WINDOW_SHOWN | SDL.SDL_WindowFlags.SDL_WINDOW_OPENGL);
+            SDL.SDL_WindowFlags.SDL_WINDOW_SHOWN | SDL.SDL_WindowFlags.SDL_WINDOW_OPENGL |
+            SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE);
 
         if (Handle == IntPtr.Zero)
         {
@@ -39,11 +41,18 @@ public sealed class Window
         }
     }
 
-    /// <summary>Call when handling SDL_WINDOWEVENT_RESIZED so Width/Height stay current.</summary>
-    public void OnResized(int width, int height)
+    /// <summary>Re-reads the drawable size; call on SDL_WINDOWEVENT_SIZE_CHANGED (user resize,
+    /// maximise/restore, and programmatic changes all raise it). Returns true if it changed.</summary>
+    public bool RefreshSize()
     {
+        SDL.SDL_GL_GetDrawableSize(Handle, out int width, out int height);
+        if (width <= 0 || height <= 0 || (width == Width && height == Height))
+        {
+            return false;
+        }
         Width = width;
         Height = height;
+        return true;
     }
 
     public void Destroy()

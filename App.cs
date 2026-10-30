@@ -49,7 +49,7 @@ public sealed class App
             Console.WriteLine($"There was an issue initilizing SDL. {SDL.SDL_GetError()}");
         }
 
-        _window = new Window("SDL .NET 8 Tutorial", 640, 480);
+        _window = new Window("fractal-audio", 1280, 720);
 
         _glContext = SDL.SDL_GL_CreateContext(_window.Handle);
         if (_glContext == IntPtr.Zero)
@@ -143,13 +143,13 @@ public sealed class App
                     break;
 
                 case SDL.SDL_EventType.SDL_WINDOWEVENT:
-                    if (e.window.windowEvent == SDL.SDL_WindowEventID.SDL_WINDOWEVENT_RESIZED)
+                    // SIZE_CHANGED rather than RESIZED: it also fires for maximise/restore and
+                    // programmatic size changes. The feedback targets follow on the next frame.
+                    if (e.window.windowEvent == SDL.SDL_WindowEventID.SDL_WINDOWEVENT_SIZE_CHANGED
+                        && _window != null && _window.RefreshSize())
                     {
-                        _window?.OnResized(e.window.data1, e.window.data2);
-                        if (_window != null && _gl != null)
-                        {
-                            _gl.Viewport(0, 0, (uint)_window.Width, (uint)_window.Height);
-                        }
+                        _gl?.Viewport(0, 0, (uint)_window.Width, (uint)_window.Height);
+                        Console.WriteLine($"[App] drawable size {_window.Width}x{_window.Height}");
                     }
                     break;
             }
