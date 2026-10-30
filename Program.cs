@@ -1,3 +1,3 @@
 using FractalAudio;
 
-return new App().Run();
+return new App(args).Run();

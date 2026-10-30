@@ -13,6 +13,7 @@ public sealed class Window
     public IntPtr Handle { get; }
     public int Width { get; private set; }
     public int Height { get; private set; }
+    public bool IsFullscreen { get; private set; }
 
     public Window(string title, int width, int height)
     {
@@ -53,6 +54,27 @@ public sealed class Window
         Width = width;
         Height = height;
         return true;
+    }
+
+    /// <summary>Borderless fullscreen on the window's current display (SDL's "desktop" mode, so
+    /// the display mode never changes and switching is instant), with the cursor hidden.
+    /// The size change arrives as a normal SIZE_CHANGED event.</summary>
+    public void SetFullscreen(bool fullscreen)
+    {
+        if (fullscreen == IsFullscreen)
+        {
+            return;
+        }
+
+        uint flags = fullscreen ? (uint)SDL.SDL_WindowFlags.SDL_WINDOW_FULLSCREEN_DESKTOP : 0u;
+        if (SDL.SDL_SetWindowFullscreen(Handle, flags) != 0)
+        {
+            Console.WriteLine($"[Window] fullscreen switch failed: {SDL.SDL_GetError()}");
+            return;
+        }
+        IsFullscreen = fullscreen;
+        Console.WriteLine($"[Window] fullscreen {(fullscreen ? "on" : "off")}");
+        SDL.SDL_ShowCursor(fullscreen ? SDL.SDL_DISABLE : SDL.SDL_ENABLE);
     }
 
     public void Destroy()

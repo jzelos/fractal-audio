@@ -17,7 +17,16 @@ dotnet run
 ```
 
 Play some music in any app; the visuals follow it. With no audio playing the visual settles to an
-idle state. Press **F** to turn the motion trails (feedback) on or off.
+idle state.
+
+| Key | Action |
+| --- | --- |
+| **F11** / **Alt+Enter** | Borderless fullscreen on/off (**Esc** leaves it) |
+| **F** | Motion trails (feedback) on/off |
+| **D** / **F1** | Diagnostics overlay on/off |
+| **T** / **Space** | Tap tempo |
+
+The window can be resized and maximised freely. `dotnet run -- --fullscreen` starts in fullscreen.
 
 Shaders in `shaders/` are copied to the output folder and hot-reloaded: edit the copy under
 `bin/Debug/net8.0/shaders/` while the app runs and it recompiles live. A shader with errors is

@@ -40,6 +40,14 @@ public sealed class App
         Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "consola.ttf");
     private const int OverlayFontPointSize = 13;
 
+    private readonly bool _startFullscreen;
+
+    /// <param name="args">Command line: <c>--fullscreen</c> starts in borderless fullscreen.</param>
+    public App(string[] args)
+    {
+        _startFullscreen = args.Contains("--fullscreen", StringComparer.OrdinalIgnoreCase);
+    }
+
     public int Run()
     {
         SDL.SDL_SetHint(SDL.SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING, "1");
@@ -83,6 +91,7 @@ public sealed class App
             Path.Combine(ShaderDirectory, "fractal.frag"));
 
         _gl.Viewport(0, 0, (uint)_window.Width, (uint)_window.Height);
+        _window.SetFullscreen(_startFullscreen);
 
         _audioFrameBus = new AudioFrameBus();
         _audioCapture = new AudioCapture();
@@ -127,6 +136,15 @@ public sealed class App
                         case SDL.SDL_Keycode.SDLK_d:
                         case SDL.SDL_Keycode.SDLK_F1:
                             _overlayVisible = !_overlayVisible;
+                            break;
+                        case SDL.SDL_Keycode.SDLK_F11:
+                            _window?.SetFullscreen(!_window.IsFullscreen);
+                            break;
+                        case SDL.SDL_Keycode.SDLK_RETURN when (e.key.keysym.mod & SDL.SDL_Keymod.KMOD_ALT) != 0:
+                            _window?.SetFullscreen(!_window.IsFullscreen);
+                            break;
+                        case SDL.SDL_Keycode.SDLK_ESCAPE:
+                            _window?.SetFullscreen(false);
                             break;
                         case SDL.SDL_Keycode.SDLK_f:
                             if (_feedback != null)
