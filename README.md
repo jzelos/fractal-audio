@@ -22,11 +22,14 @@ idle state.
 | Key | Action |
 | --- | --- |
 | **F11** / **Alt+Enter** | Borderless fullscreen on/off (**Esc** leaves it) |
+| **M** | Move to the next display (stays fullscreen if it was) |
 | **F** | Motion trails (feedback) on/off |
 | **D** / **F1** | Diagnostics overlay on/off |
 | **T** / **Space** | Tap tempo |
 
-The window can be resized and maximised freely. `dotnet run -- --fullscreen` starts in fullscreen.
+The window can be resized and maximised freely. Command-line options (after `dotnet run --`):
+`--fullscreen` starts in fullscreen, and `--display N` starts on display N — the connected
+displays are numbered from 1 in the console output at startup.
 
 Shaders in `shaders/` are copied to the output folder and hot-reloaded: edit the copy under
 `bin/Debug/net8.0/shaders/` while the app runs and it recompiles live. A shader with errors is

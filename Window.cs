@@ -56,6 +56,45 @@ public sealed class Window
         return true;
     }
 
+    /// <summary>Number of connected displays (at least 1).</summary>
+    public static int DisplayCount => Math.Max(SDL.SDL_GetNumVideoDisplays(), 1);
+
+    /// <summary>The display (0-based) the window is mostly on.</summary>
+    public int DisplayIndex => Math.Max(SDL.SDL_GetWindowDisplayIndex(Handle), 0);
+
+    /// <summary>Logs each connected display, 1-based to match <c>--display</c>.</summary>
+    public static void LogDisplays()
+    {
+        for (int i = 0; i < DisplayCount; i++)
+        {
+            SDL.SDL_GetDisplayBounds(i, out SDL.SDL_Rect b);
+            Console.WriteLine($"[Window] display {i + 1}: {SDL.SDL_GetDisplayName(i)} {b.w}x{b.h} at ({b.x},{b.y})");
+        }
+    }
+
+    /// <summary>Centres the window on display <paramref name="index"/> (0-based), keeping
+    /// fullscreen if it was on — SDL fullscreens on whichever display the window is on, so it
+    /// drops out, moves, and goes back in.</summary>
+    public void MoveToDisplay(int index)
+    {
+        if (index < 0 || index >= DisplayCount)
+        {
+            Console.WriteLine($"[Window] no display {index + 1} (have {DisplayCount}); staying put");
+            return;
+        }
+
+        bool wasFullscreen = IsFullscreen;
+        SetFullscreen(false);
+        SDL.SDL_GetDisplayBounds(index, out SDL.SDL_Rect b);
+        SDL.SDL_GetWindowSize(Handle, out int w, out int h);
+        w = Math.Min(w, b.w);
+        h = Math.Min(h, b.h);
+        SDL.SDL_SetWindowSize(Handle, w, h);
+        SDL.SDL_SetWindowPosition(Handle, b.x + ((b.w - w) / 2), b.y + ((b.h - h) / 2));
+        SetFullscreen(wasFullscreen);
+        Console.WriteLine($"[Window] moved to display {index + 1}");
+    }
+
     /// <summary>Borderless fullscreen on the window's current display (SDL's "desktop" mode, so
     /// the display mode never changes and switching is instant), with the cursor hidden.
     /// The size change arrives as a normal SIZE_CHANGED event.</summary>

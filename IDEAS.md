@@ -182,7 +182,10 @@ beat. All four are traceable to specific code, not vague polish — see each ite
   (a dozen fold-and-scale iterations), and 2–3 parameters change their character dramatically — which is
   exactly what you want to hand to audio features. Better audio-reactivity-per-flop than Mandelbrot.
   · effort: medium · risk: easy to produce epilepsy-grade strobing; rate-limit parameter deltas
-- **Keyboard VJ controls + borderless fullscreen (`SDL_WINDOW_FULLSCREEN_DESKTOP`) + display picker**
+- *(Partly done 2026-10-30: resizable/maximisable window, borderless fullscreen (F11/Alt+Enter,
+  `--fullscreen`), display choice (`--display N`, M = next display). Preset/palette keys,
+  freeze, manual overrides, mouse pan/zoom, panic-to-black still open.)*
+  **Keyboard VJ controls + borderless fullscreen (`SDL_WINDOW_FULLSCREEN_DESKTOP`) + display picker**
   — [grounded] Currently only SDL_QUIT is handled. Needed: fullscreen toggle, next/prev preset, next/prev
   palette, freeze/hold, manual override of one or two params, pan/zoom with mouse, hide cursor, panic-to-
   black. Makes the thing demoable on a second monitor. · effort: small · risk: none
@@ -307,3 +310,5 @@ unverified pending exactly this kind of check, so this is the expected next loop
 - 2026-10-30 [worker] Playtest 4 feedback: trails look good; wants something more colourful than
   the black silhouette. Interior now coloured by an orbit trap (closest approach to the origin)
   through the shifted, dimmed palette (`shaders/fractal.frag` INTERIOR_* constants).
+- 2026-10-30 [worker] Tier 2: window sizing — resizable/maximise, borderless fullscreen, display
+  picker. Moving between displays untested (one monitor here).

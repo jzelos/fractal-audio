@@ -41,11 +41,18 @@ public sealed class App
     private const int OverlayFontPointSize = 13;
 
     private readonly bool _startFullscreen;
+    private readonly int? _startDisplay; // 0-based.
 
-    /// <param name="args">Command line: <c>--fullscreen</c> starts in borderless fullscreen.</param>
+    /// <param name="args">Command line: <c>--fullscreen</c> starts in borderless fullscreen;
+    /// <c>--display N</c> starts on display N (1-based, as logged at startup).</param>
     public App(string[] args)
     {
         _startFullscreen = args.Contains("--fullscreen", StringComparer.OrdinalIgnoreCase);
+        int at = Array.FindIndex(args, a => a.Equals("--display", StringComparison.OrdinalIgnoreCase));
+        if (at >= 0 && at + 1 < args.Length && int.TryParse(args[at + 1], out int display))
+        {
+            _startDisplay = display - 1;
+        }
     }
 
     public int Run()
@@ -91,6 +98,11 @@ public sealed class App
             Path.Combine(ShaderDirectory, "fractal.frag"));
 
         _gl.Viewport(0, 0, (uint)_window.Width, (uint)_window.Height);
+        Window.LogDisplays();
+        if (_startDisplay is int display)
+        {
+            _window.MoveToDisplay(display);
+        }
         _window.SetFullscreen(_startFullscreen);
 
         _audioFrameBus = new AudioFrameBus();
@@ -142,6 +154,9 @@ public sealed class App
                             break;
                         case SDL.SDL_Keycode.SDLK_RETURN when (e.key.keysym.mod & SDL.SDL_Keymod.KMOD_ALT) != 0:
                             _window?.SetFullscreen(!_window.IsFullscreen);
+                            break;
+                        case SDL.SDL_Keycode.SDLK_m when _window != null:
+                            _window.MoveToDisplay((_window.DisplayIndex + 1) % Window.DisplayCount);
                             break;
                         case SDL.SDL_Keycode.SDLK_ESCAPE:
                             _window?.SetFullscreen(false);
