@@ -31,7 +31,7 @@ tap **T** or **Space** along with the music to compare your tempo with the track
 To record what the beat tracker sees, set `FRACTAL_AUDIO_DUMP` to a file path before running:
 
 ```powershell
-$env:FRACTAL_AUDIO_DUMP = "C:\temp\track.csv"; dotnet run --project FractalAudio.csproj
+$env:FRACTAL_AUDIO_DUMP = "recordings\catch.csv"; dotnet run --project FractalAudio.csproj
 ```
 
 `tools/TempoReplay` feeds such dumps through the app's own beat pipeline and scores the tempo
@@ -39,8 +39,11 @@ against known BPMs, so tracker changes can be checked against recordings without
 the music:
 
 ```powershell
-dotnet run --project tools/TempoReplay -- C:\temp\track.csv=150 C:\temp\other.csv=97 --timeline
+dotnet run --project tools/TempoReplay -- recordings\catch.csv=130 recordings\disco.csv=97 --timeline
 ```
+
+Keep dumps in `recordings/` (git-ignored). Its README lists the known-BPM test tracks, the file
+names to record them under, and a command that scores them all.
 
 `--trace=FROM-TO` prints each estimate's decision steps within that time range (seconds). The
 tool exits non-zero if any dump scores below 90%.
@@ -56,6 +59,7 @@ tool exits non-zero if any dump scores below 90%.
 | `shaders/` | `quad.vert`, `fractal.frag` (Julia escape-time with smooth colouring) |
 | `Diagnostics/` | On-screen overlay text and tap tempo |
 | `tools/TempoReplay/` | Replays tempo dumps through the beat pipeline (see Tempo diagnostics) |
+| `recordings/` | Git-ignored tempo dumps of the known-BPM test tracks (see its README) |
 
 ## Docs
 

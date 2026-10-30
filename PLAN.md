@@ -267,9 +267,10 @@ fade rather than snap; waypoint jumps and zoom punches land on kicks, not hi-hat
 
 ## Tempo test tracks (user-confirmed BPM)
 
-Recordings of these (FRACTAL_AUDIO_DUMP) can be scored with `tools/TempoReplay`; the dumps live
-outside the repo (they are tens of MB). Replay scores at `HEAD` (exact = within 3%, readings
-every 0.5s after 10s): Diesel Power, Overdrive, Disco, Teardrop, Catch, PNG 99-100%;
+Recordings of these (FRACTAL_AUDIO_DUMP) can be scored with `tools/TempoReplay`; the dumps go
+in the git-ignored `recordings/` (they are tens of MB; file names in `recordings/README.md`).
+The earlier dumps were lost with an old session's scratch folder and need re-recording. Replay scores at `c9364e9`-era `HEAD` (exact = within 3%,
+readings every 0.5s after 10s): Diesel Power, Overdrive, Disco, Teardrop, Catch, PNG 99-100%;
 Hyperspeed 79% (misses are its half-time intro, corrected once the full beat enters); KLF 46%
 (riff-only intro reads 79 until the kick enters — Catch, KLF and PNG dumps predate the
 audio-time framing fix).

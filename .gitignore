@@ -18,3 +18,7 @@ buildout/
 # OS
 Thumbs.db
 .DS_Store
+
+# Tempo dumps (tens of MB each) — see recordings/README.md
+recordings/*
+!recordings/README.md

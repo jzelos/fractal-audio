@@ -27,4 +27,9 @@
     <None Remove="tools\**" />
   </ItemGroup>
 
+  <!-- Tempo dumps are tens of MB; keep them out of the project's item lists. -->
+  <ItemGroup>
+    <None Remove="recordings\**" />
+  </ItemGroup>
+
 </Project>
