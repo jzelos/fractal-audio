@@ -117,6 +117,8 @@ public sealed class AudioToFractalMapper
     private long _gridBeats; // grid beats since the tempo last locked.
     private float _beatPulse;
     private float _beatPulseTarget;
+    private AudioFrame? _phaseFrame;
+    private double _phaseFrameSeenSeconds;
     private float _fitZoom = 1f;
 
     private float _smoothCentroid;
@@ -274,8 +276,14 @@ public sealed class AudioToFractalMapper
         // bounded, so the silhouette grows toward the border on loud passages but never past it. ---
         // The pulse chases a target that a beat sets to 1 and that then decays, so it rises over
         // a few frames instead of stepping, and never exceeds 1.
+        // Locked, the target is instead a function of the tracker's beat phase (a beat-locked
+        // LFO): free of the analyzer/render frame jitter on the beat event, and it starts rising
+        // one attack time before the beat, so the punch peaks on the beat rather than after it.
         _beatPulseTarget *= MathF.Exp(-dtF / BeatPulseDecaySeconds);
-        _beatPulse = Smooth(_beatPulse, _beatPulseTarget, BeatPulseAttackSeconds, dtF);
+        float pulseTarget = locked
+            ? PhaseLockedPulse(frame, nowSeconds)
+            : _beatPulseTarget;
+        _beatPulse = Smooth(_beatPulse, pulseTarget, BeatPulseAttackSeconds, dtF);
         float zoom = Math.Clamp(
             _fitZoom * (ZoomRestScale + (ZoomBreathDepth * _smoothZoomBass) + (ZoomBeatPunch * _beatPulse)), MinZoom, MaxZoom);
 
@@ -295,6 +303,29 @@ public sealed class AudioToFractalMapper
         Diagnostics = new MapperDiagnostics(
             cx, cy, _targetWaypointIndex, Waypoints.Length, zoom, _fitZoom,
             _paletteFrom, _paletteTo, paletteBlend);
+    }
+
+    /// <summary>Beat-pulse target from the tempo grid: 1 for the last attack time before a
+    /// beat, then decaying. The analyzer publishes ~50 frames/s against ~60 render frames/s, so
+    /// the phase is extrapolated from when this frame was first seen.</summary>
+    private float PhaseLockedPulse(AudioFrame frame, double nowSeconds)
+    {
+        if (!ReferenceEquals(frame, _phaseFrame))
+        {
+            _phaseFrame = frame;
+            _phaseFrameSeenSeconds = nowSeconds;
+        }
+
+        float beatSeconds = 60f / frame.TempoBpm;
+        // Phase 0 here is where the grid beat fires (BeatLeadSeconds before the tracker's beat).
+        float phase = frame.BeatPhase
+            + ((float)(nowSeconds - _phaseFrameSeenSeconds) / beatSeconds)
+            + (BeatPipeline.BeatLeadSeconds / beatSeconds);
+        phase -= MathF.Floor(phase);
+
+        float sinceBeat = phase * beatSeconds;
+        float untilBeat = beatSeconds - sinceBeat;
+        return untilBeat <= BeatPulseAttackSeconds ? 1f : MathF.Exp(-sinceBeat / BeatPulseDecaySeconds);
     }
 
     private void AdvanceWaypoint(double nowSeconds)

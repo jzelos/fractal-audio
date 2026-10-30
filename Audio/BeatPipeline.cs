@@ -21,7 +21,8 @@ public sealed class BeatPipeline
     private const int KickRefractoryFrames = 20;        // ~400ms, i.e. caps at ~150 BPM.
 
     // Grid beats fire this early to cover the analysis window plus about a frame of display latency.
-    private const float BeatLeadSeconds = 0.05f;
+    // Public so phase-driven visuals can place the beat where the fired grid beat sits.
+    public const float BeatLeadSeconds = 0.05f;
 
     // Tempo tracker input: full-band log-compressed spectral flux, normalised by its running mean.
     // Bass alone failed on "Catch" (Kosheen, 130 BPM): its sustained bass line has ~no

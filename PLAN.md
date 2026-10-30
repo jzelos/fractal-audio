@@ -739,3 +739,11 @@ parametric curve". Concretely, for Tier 1:
   vocals) after a 6s hold, i.e. at a time unrelated to the beat. Unlocked behaviour unchanged.
   Build clean; 20s smoke run against live system audio (tempo unlocked, conf ~0.15) clean. Locked
   behaviour NOT verified live.
+- 2026-10-30 [worker] Beat sync, zoom punch: first beat-phase-locked LFO (IDEAS.md Tier 2 item,
+  the "real fix" for feedback #5). While locked, the zoom-punch target is computed from
+  `AudioFrame.BeatPhase` (shifted by `BeatPipeline.BeatLeadSeconds` so phase 0 is the fired grid
+  beat, extrapolated between ~50Hz analyzer frames at the ~60Hz render rate) instead of being
+  set by the beat event: 1 for the last 40ms before the beat, then the same 0.25s decay, so the
+  smoothed pulse peaks on the beat instead of ~40ms after it and carries no analyzer/render frame
+  jitter. Unlocked, the event-driven pulse is unchanged. Build clean; 30s smoke run clean, but the
+  live audio never locked, so the phase path is NOT verified live.
