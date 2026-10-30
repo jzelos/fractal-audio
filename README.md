@@ -17,7 +17,7 @@ dotnet run
 ```
 
 Play some music in any app; the visuals follow it. With no audio playing the visual settles to an
-idle state.
+idle state. Press **F** to turn the motion trails (feedback) on or off.
 
 Shaders in `shaders/` are copied to the output folder and hot-reloaded: edit the copy under
 `bin/Debug/net8.0/shaders/` while the app runs and it recompiles live. A shader with errors is
@@ -54,9 +54,9 @@ tool exits non-zero if any dump scores below 90%.
 | --- | --- |
 | `App.cs`, `Window.cs`, `Clock.cs` | SDL window + GL context, main loop, fixed-step timing |
 | `Audio/` | Loopback capture, FFT analysis, envelope followers, onset/beat detectors, `AudioFrame` snapshot bus |
-| `Graphics/` | GL loader, shader program + hot reload, fullscreen quad, palette atlas |
+| `Graphics/` | GL loader, shader program + hot reload, fullscreen quad, palette atlas, feedback (trail) buffer |
 | `Mapping/` | `AudioToFractalMapper` — the single place audio features become shader uniforms; `JuliaBounds` keeps the shape on screen |
-| `shaders/` | `quad.vert`, `fractal.frag` (Julia escape-time with smooth colouring) |
+| `shaders/` | `quad.vert`, `fractal.frag` (Julia escape-time with smooth colouring), `feedback.frag` (motion trails), `present.frag` |
 | `Diagnostics/` | On-screen overlay text and tap tempo |
 | `tools/TempoReplay/` | Replays tempo dumps through the beat pipeline (see Tempo diagnostics) |
 | `recordings/` | Git-ignored tempo dumps of the known-BPM test tracks (see its README) |

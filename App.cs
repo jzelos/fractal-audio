@@ -23,6 +23,7 @@ public sealed class App
     private ShaderHotReloader? _shaderReloader;
     private FullscreenQuad? _quad;
     private PaletteTexture? _palette;
+    private FeedbackBuffer? _feedback;
     private AudioCapture? _audioCapture;
     private AudioAnalyzer? _audioAnalyzer;
     private AudioFrameBus? _audioFrameBus;
@@ -73,6 +74,7 @@ public sealed class App
 
         _quad = new FullscreenQuad(_gl);
         _palette = new PaletteTexture(_gl);
+        _feedback = new FeedbackBuffer(_gl, ShaderDirectory);
         _overlay = TextOverlay.TryCreate(_gl, OverlayFontPath, OverlayFontPointSize, ShaderDirectory);
 
         _shaderReloader = new ShaderHotReloader(
@@ -126,6 +128,13 @@ public sealed class App
                         case SDL.SDL_Keycode.SDLK_F1:
                             _overlayVisible = !_overlayVisible;
                             break;
+                        case SDL.SDL_Keycode.SDLK_f:
+                            if (_feedback != null)
+                            {
+                                _feedback.Enabled = !_feedback.Enabled;
+                                Console.WriteLine($"[App] feedback {(_feedback.Enabled ? "on" : "off")}");
+                            }
+                            break;
                         case SDL.SDL_Keycode.SDLK_t:
                         case SDL.SDL_Keycode.SDLK_SPACE:
                             _tapTempo.Tap(_clock.ElapsedSeconds);
@@ -157,7 +166,7 @@ public sealed class App
     private void Draw()
     {
         if (_gl == null || _shaderReloader == null || _quad == null || _window == null ||
-            _palette == null || _mapper == null || _audioFrameBus == null)
+            _palette == null || _mapper == null || _audioFrameBus == null || _feedback == null)
         {
             return;
         }
@@ -166,6 +175,9 @@ public sealed class App
         // thread-affinity note in ShaderHotReloader.
         _shaderReloader.Update();
 
+        // The fractal draws offscreen; the feedback pass composites it over the previous frame's
+        // trails and puts the result on screen.
+        _feedback.BeginFresh(_window.Width, _window.Height);
         _gl.ClearColor(0f, 0f, 0f, 1f);
         _gl.Clear(ClearBufferMask.ColorBufferBit);
 
@@ -187,6 +199,7 @@ public sealed class App
         program.SetUniform1i("u_palette", 0);
 
         _quad.Draw();
+        _feedback.CompositeAndPresent(_quad, dt);
 
         // Diagnostics overlay: reads the frame + mapper state, never writes fractal uniforms.
         if (_overlayVisible && _overlay != null)
@@ -215,6 +228,7 @@ public sealed class App
         // down the GL context/window/SDL itself last.
         _quad?.Dispose();
         _palette?.Dispose();
+        _feedback?.Dispose();
         _overlay?.Dispose();
         _shaderReloader?.Dispose();
 

@@ -161,7 +161,9 @@ beat. All four are traceable to specific code, not vague polish — see each ite
 
 ### Tier 2 — depth, variety, usability
 
-- **Feedback / persistence buffer: ping-pong FBO with a per-frame zoom+rotate+warp of the previous frame**
+- *(Done 2026-10-30, constant warp: `Graphics/FeedbackBuffer.cs` + `shaders/feedback.frag` —
+  fixed zoom-out/rotation/fade, max-composite, F toggles. Audio-driven warp still open.)*
+  **Feedback / persistence buffer: ping-pong FBO with a per-frame zoom+rotate+warp of the previous frame**
   — [grounded, this is the Milkdrop/projectM core trick] libprojectM's whole aesthetic is "warp the previous
   frame, then composite". Adding this on top of *any* fractal shader turns static zooms into motion trails
   and makes beats smear into visible energy. Highest value-to-effort item in Tier 2 by a wide margin.
@@ -299,3 +301,4 @@ unverified pending exactly this kind of check, so this is the expected next loop
   changes and the zoom punch now follow the tempo grid while locked (see PLAN.md change log).
 - 2026-10-30 [worker] Tier 1 fix #4: palette crossfades also last whole beats while locked —
   the last off-grid discrete timing. Remaining step is the playtest.
+- 2026-10-30 [worker] Tier 2: feedback buffer (constant warp, F toggle).
