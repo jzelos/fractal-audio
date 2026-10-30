@@ -62,7 +62,7 @@ public sealed class AudioToFractalMapper
     private const float GlideSeconds = 0.9f;           // beat-triggered waypoint glide (locked: rounded to whole beats).
     private const float MinWaypointHoldSeconds = 1.5f; // beats inside this window punch the zoom but don't change shape.
     private const float PaletteRotationSpeed = 0.6f;   // palette-phase units/sec at Rms == 1.
-    private const float PaletteFadeSeconds = 1.5f;     // palette crossfade duration.
+    private const float PaletteFadeSeconds = 1.5f;     // palette crossfade duration (locked: rounded to whole beats).
     private const float MinPaletteHoldSeconds = 6.0f;  // minimum time between palette changes (locked: rounded up to a power-of-two beat count).
     // Zoom is expressed relative to the "fit" zoom that puts the silhouette exactly at the
     // border: zoom = fit * (rest + depth*bass + punch*beatPulse), and rest + depth + punch == 1,
@@ -130,6 +130,7 @@ public sealed class AudioToFractalMapper
     private int _paletteFrom;
     private int _paletteTo;
     private double _paletteChangeSeconds = -MinPaletteHoldSeconds;
+    private float _paletteFadeSeconds = PaletteFadeSeconds;
     private float _paletteOffset;
 
     public AudioToFractalMapper(int paletteCount)
@@ -195,10 +196,14 @@ public sealed class AudioToFractalMapper
                 }
                 // The fade check only matters when the tempo has just locked after an
                 // onset-driven change: never cut a crossfade short.
-                if (_gridBeats % BeatsSpanning(frame.TempoBpm, MinPaletteHoldSeconds) == 0
-                    && nowSeconds - _paletteChangeSeconds >= PaletteFadeSeconds)
+                int beatsPerPalette = BeatsSpanning(frame.TempoBpm, MinPaletteHoldSeconds);
+                if (_gridBeats % beatsPerPalette == 0
+                    && nowSeconds - _paletteChangeSeconds >= _paletteFadeSeconds)
                 {
-                    AdvancePalette(nowSeconds);
+                    // Like the glide: fade for a whole number of beats, so it ends on a beat.
+                    float beatSeconds = 60f / frame.TempoBpm;
+                    int fadeBeats = Math.Clamp((int)MathF.Round(PaletteFadeSeconds / beatSeconds), 1, beatsPerPalette);
+                    AdvancePalette(nowSeconds, fadeBeats * beatSeconds);
                 }
             }
             else if (nowSeconds - _waypointChangeSeconds >= MinWaypointHoldSeconds)
@@ -209,7 +214,7 @@ public sealed class AudioToFractalMapper
 
         if (!locked && onset && nowSeconds - _paletteChangeSeconds >= MinPaletteHoldSeconds)
         {
-            AdvancePalette(nowSeconds);
+            AdvancePalette(nowSeconds, PaletteFadeSeconds);
         }
 
         // --- Normalise band envelopes (raw FFT magnitudes sit far below 1) with a decaying
@@ -262,7 +267,7 @@ public sealed class AudioToFractalMapper
             MaxPaletteOffsetDeltaPerSecond * dtF);
         _paletteOffset += paletteDelta;
         _paletteOffset -= MathF.Floor(_paletteOffset); // wrap to [0,1)
-        float paletteBlend = SmoothStep((float)Math.Clamp((nowSeconds - _paletteChangeSeconds) / PaletteFadeSeconds, 0.0, 1.0));
+        float paletteBlend = SmoothStep((float)Math.Clamp((nowSeconds - _paletteChangeSeconds) / _paletteFadeSeconds, 0.0, 1.0));
 
         // --- Fit: the zoom at which the silhouette's extent for the current `c` touches the
         // border (fractal.frag maps screen to y in [-1,1], x in [-aspect,aspect]). The set is
@@ -343,8 +348,9 @@ public sealed class AudioToFractalMapper
         _waypointChangeSeconds = nowSeconds;
     }
 
-    private void AdvancePalette(double nowSeconds)
+    private void AdvancePalette(double nowSeconds, float fadeSeconds)
     {
+        _paletteFadeSeconds = fadeSeconds;
         _paletteFrom = _paletteTo;
         _paletteTo = (_paletteTo + 1) % PaletteCount;
         _paletteChangeSeconds = nowSeconds;
