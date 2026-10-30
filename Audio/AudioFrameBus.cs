@@ -1,4 +1,4 @@
-namespace SDL_Demo.Audio;
+namespace FractalAudio.Audio;
 
 /// <summary>
 /// Lock-free single-writer (audio analyzer thread)/single-reader (render thread) publish/consume

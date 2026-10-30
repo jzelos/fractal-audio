@@ -1,6 +1,6 @@
 using Silk.NET.OpenGL;
 
-namespace SDL_Demo.Graphics;
+namespace FractalAudio.Graphics;
 
 /// <summary>
 /// Compiles/links a vertex+fragment shader pair into a GL program. Throws

@@ -1,7 +1,7 @@
 using SDL2;
 using Silk.NET.OpenGL;
 
-namespace SDL_Demo.Graphics;
+namespace FractalAudio.Graphics;
 
 /// <summary>
 /// One-shot spike/shim: builds a Silk.NET <see cref="GL"/> instance whose function pointers are

@@ -1,4 +1,4 @@
-namespace SDL_Demo.Audio;
+namespace FractalAudio.Audio;
 
 /// <summary>
 /// Everything between one frame's FFT magnitudes and a beat: the raw bass-band kick detector,

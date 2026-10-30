@@ -1,6 +1,6 @@
 using Silk.NET.OpenGL;
 
-namespace SDL_Demo.Graphics;
+namespace FractalAudio.Graphics;
 
 /// <summary>
 /// VAO/VBO/EBO for a single screen-filling quad (2 triangles, NDC position + UV). No per-frame

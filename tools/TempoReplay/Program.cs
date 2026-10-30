@@ -1,9 +1,9 @@
 using System.Globalization;
-using SDL_Demo.Audio;
+using FractalAudio.Audio;
 
 // Usage: TempoReplay <dump.csv>=<trueBpm> [<dump.csv>=<trueBpm> ...] [--timeline]
 //
-// Feeds each SDL_DEMO_DUMP file through the same BeatPipeline the app runs and reports, per
+// Feeds each FRACTAL_AUDIO_DUMP file through the same BeatPipeline the app runs and reports, per
 // dump, the share of tempo readings (sampled every 0.5s after a 10s warm-up) within 3% of the
 // true BPM, and how many were octave errors (half/double). Exit code 1 if any dump scores
 // below 90%, so it can gate tempo changes.

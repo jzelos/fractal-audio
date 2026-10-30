@@ -1,3 +1,3 @@
-using SDL_Demo;
+using FractalAudio;
 
 return new App().Run();

@@ -1,6 +1,6 @@
 using Silk.NET.OpenGL;
 
-namespace SDL_Demo.Graphics;
+namespace FractalAudio.Graphics;
 
 /// <summary>
 /// Watches the vertex/fragment shader source files on disk and recompiles the program when they

@@ -34,7 +34,8 @@ Tier 2/3 in IDEAS.md and must not be pulled forward even opportunistically.
 
 ## Files affected
 
-New files (paths relative to `D:\Source\SDL_Demo\`):
+New files (paths relative to the project root; the project was `SDL_Demo` until 2026-10-30,
+now `fractal-audio` / `FractalAudio.csproj` — historical entries below keep the old names):
 
 - `SDL_Demo.csproj` — fix `AllowUnsafeCode` -> `AllowUnsafeBlocks`; add `PackageReference` for
   `NAudio` and `Silk.NET.OpenGL`; add `<ItemGroup>` to copy `shaders/**` to output
@@ -266,7 +267,7 @@ fade rather than snap; waypoint jumps and zoom punches land on kicks, not hi-hat
 
 ## Tempo test tracks (user-confirmed BPM)
 
-Recordings of these (SDL_DEMO_DUMP) can be scored with `tools/TempoReplay`; the dumps live
+Recordings of these (FRACTAL_AUDIO_DUMP) can be scored with `tools/TempoReplay`; the dumps live
 outside the repo (they are tens of MB). Replay scores at `HEAD` (exact = within 3%, readings
 every 0.5s after 10s): Diesel Power, Overdrive, Disco, Teardrop, Catch, PNG 99-100%;
 Hyperspeed 79% (misses are its half-time intro, corrected once the full beat enters); KLF 46%

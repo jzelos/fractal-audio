@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Replays SDL_DEMO_DUMP frame dumps through the app's own beat pipeline (the source files
+  <!-- Replays FRACTAL_AUDIO_DUMP frame dumps through the app's own beat pipeline (the source files
        below are compiled in directly, not copied) and scores the tempo against known BPMs. -->
 
   <PropertyGroup>

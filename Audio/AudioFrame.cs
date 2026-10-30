@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace SDL_Demo.Audio;
+namespace FractalAudio.Audio;
 
 /// <summary>
 /// Immutable snapshot of one analysis tick's audio features. A sealed class (not a struct) —

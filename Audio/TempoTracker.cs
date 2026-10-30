@@ -1,4 +1,4 @@
-namespace SDL_Demo.Audio;
+namespace FractalAudio.Audio;
 
 /// <summary>
 /// Tempo estimate + phase-locked beat clock (IDEAS.md Tier 2 "tempo estimate + beat-phase-locked

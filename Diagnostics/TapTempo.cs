@@ -1,4 +1,4 @@
-namespace SDL_Demo.Diagnostics;
+namespace FractalAudio.Diagnostics;
 
 /// <summary>
 /// Tap-tempo: the user taps along with the beat they hear; BPM is the mean of the recent tap

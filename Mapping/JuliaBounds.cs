@@ -1,4 +1,4 @@
-namespace SDL_Demo.Mapping;
+namespace FractalAudio.Mapping;
 
 /// <summary>
 /// Coarse CPU estimate of how far the visible "silhouette" of the filled Julia set for z^2 + c

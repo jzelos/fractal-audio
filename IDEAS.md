@@ -1,6 +1,6 @@
 # Feature ideas
 
-Project: `SDL_Demo` — C#/.NET 8, `Sayers.SDL2.Core` 1.0.11, currently a 73-line top-level-statement
+Project: `fractal-audio` (originally `SDL_Demo`; renamed 2026-10-30) — C#/.NET 8, `Sayers.SDL2.Core` 1.0.11, currently a 73-line top-level-statement
 SDL skeleton (`Program.cs`): init video, 640x480 window, accelerated+vsync renderer, clear-to-skyblue
 loop, SDL_QUIT teardown. Target product: a real-time fractal visualizer driven by live system audio
 output (WASAPI loopback) on Windows.

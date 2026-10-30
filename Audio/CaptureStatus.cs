@@ -1,4 +1,4 @@
-namespace SDL_Demo.Audio;
+namespace FractalAudio.Audio;
 
 /// <summary>
 /// Current health of the WASAPI loopback capture pipeline, set by <see cref="AudioCapture"/> and

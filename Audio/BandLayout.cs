@@ -1,4 +1,4 @@
-namespace SDL_Demo.Audio;
+namespace FractalAudio.Audio;
 
 /// <summary>
 /// FFT-bin ranges for the analyzer's 7 bands, computed from the *actual* sample rate (not

@@ -1,9 +1,9 @@
 using System.Globalization;
-using SDL_Demo.Audio;
-using SDL_Demo.Graphics;
-using SDL_Demo.Mapping;
+using FractalAudio.Audio;
+using FractalAudio.Graphics;
+using FractalAudio.Mapping;
 
-namespace SDL_Demo.Diagnostics;
+namespace FractalAudio.Diagnostics;
 
 /// <summary>
 /// Builds the on-screen diagnostics text from the latest <see cref="AudioFrame"/>, the mapper's

@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using NAudio.Dsp;
 
-namespace SDL_Demo.Audio;
+namespace FractalAudio.Audio;
 
 /// <summary>
 /// Analyses <see cref="AudioCapture"/>'s mono stream in uniform audio-time frames (one per 20ms
@@ -15,7 +15,7 @@ namespace SDL_Demo.Audio;
 /// onsets, and the <see cref="BeatPipeline"/> (kick detector + tempo tracker), and publishes one
 /// <see cref="AudioFrame"/> per frame to <see cref="AudioFrameBus"/>.
 ///
-/// Setting the SDL_DEMO_DUMP environment variable to a file path writes every frame's spectrum to
+/// Setting the FRACTAL_AUDIO_DUMP environment variable to a file path writes every frame's spectrum to
 /// that file (see <see cref="WriteDumpRow"/>), for offline analysis and tools/TempoReplay.
 /// </summary>
 public sealed class AudioAnalyzer : IDisposable
@@ -67,7 +67,7 @@ public sealed class AudioAnalyzer : IDisposable
             _envelopeFollowers[i] = new EnvelopeFollower(AttackMs, ReleaseMs, TickIntervalSeconds);
         }
 
-        if (Environment.GetEnvironmentVariable("SDL_DEMO_DUMP") is { Length: > 0 } dumpPath)
+        if (Environment.GetEnvironmentVariable("FRACTAL_AUDIO_DUMP") is { Length: > 0 } dumpPath)
         {
             _dump = new StreamWriter(dumpPath) { AutoFlush = true };
             Console.WriteLine($"[AudioAnalyzer] dumping frames to {dumpPath}");
@@ -276,7 +276,7 @@ public sealed class AudioAnalyzer : IDisposable
     }
 
     /// <summary>
-    /// Opt-in frame dump (SDL_DEMO_DUMP=path). Format: a header line
+    /// Opt-in frame dump (FRACTAL_AUDIO_DUMP=path). Format: a header line
     /// "# sdl-demo-dump v1 sampleRate=N fftSize=N bins=N", then one row per frame:
     /// "seconds,tempoBpm,mag[1],...,mag[bins]" — magnitudes up to the top band's end, which is
     /// everything the beat pipeline reads, so tools/TempoReplay can reproduce it exactly.

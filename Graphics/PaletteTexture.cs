@@ -1,6 +1,6 @@
 using Silk.NET.OpenGL;
 
-namespace SDL_Demo.Graphics;
+namespace FractalAudio.Graphics;
 
 /// <summary>
 /// Palette atlas: every palette baked once, at startup, into one 256xN GL_TEXTURE_2D (one row of

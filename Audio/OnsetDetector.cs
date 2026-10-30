@@ -1,4 +1,4 @@
-namespace SDL_Demo.Audio;
+namespace FractalAudio.Audio;
 
 /// <summary>
 /// Normalized spectral flux onset/beat detector: half-wave-rectified sum of positive FFT-bin

@@ -1,4 +1,4 @@
-namespace SDL_Demo.Audio;
+namespace FractalAudio.Audio;
 
 /// <summary>
 /// Single-pole asymmetric envelope follower: fast attack, slow release. Coefficients are derived

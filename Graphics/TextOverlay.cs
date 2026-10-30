@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using SDL2;
 using Silk.NET.OpenGL;
 
-namespace SDL_Demo.Graphics;
+namespace FractalAudio.Graphics;
 
 /// <summary>
 /// Draws lines of text in a translucent panel at the top-left of the screen. Each line is

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace SDL_Demo;
+namespace FractalAudio;
 
 /// <summary>
 /// Fixed-step accumulator plus measured wall frame time. Presentation (SDL_GL_SwapWindow /

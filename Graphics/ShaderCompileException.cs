@@ -1,4 +1,4 @@
-namespace SDL_Demo.Graphics;
+namespace FractalAudio.Graphics;
 
 /// <summary>
 /// Thrown when a shader fails to compile or a program fails to link. Carries the raw GL info

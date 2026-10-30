@@ -1,4 +1,4 @@
-# SDL_Demo — audio-reactive fractal visualizer
+# fractal-audio — audio-reactive fractal visualizer
 
 A real-time Julia-set visualizer for Windows that reacts to whatever the system is playing.
 It captures system audio output via WASAPI loopback, analyses it (FFT, band energies, onset and
@@ -28,10 +28,10 @@ reported to the console and the last working version keeps rendering.
 The on-screen overlay (toggle with **D**) shows the tempo estimate, lock state and confidence;
 tap **T** or **Space** along with the music to compare your tempo with the tracker's.
 
-To record what the beat tracker sees, set `SDL_DEMO_DUMP` to a file path before running:
+To record what the beat tracker sees, set `FRACTAL_AUDIO_DUMP` to a file path before running:
 
 ```powershell
-$env:SDL_DEMO_DUMP = "C:\temp\track.csv"; dotnet run --project SDL_Demo.csproj
+$env:FRACTAL_AUDIO_DUMP = "C:\temp\track.csv"; dotnet run --project FractalAudio.csproj
 ```
 
 `tools/TempoReplay` feeds such dumps through the app's own beat pipeline and scores the tempo

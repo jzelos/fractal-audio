@@ -1,6 +1,6 @@
 using SDL2;
 
-namespace SDL_Demo;
+namespace FractalAudio;
 
 /// <summary>
 /// Wraps SDL window creation/lifetime. Sets the SDL_GL_* context attributes *before*

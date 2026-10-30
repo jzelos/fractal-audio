@@ -1,7 +1,7 @@
-using SDL_Demo.Audio;
-using SDL_Demo.Graphics;
+using FractalAudio.Audio;
+using FractalAudio.Graphics;
 
-namespace SDL_Demo.Mapping;
+namespace FractalAudio.Mapping;
 
 public readonly record struct MapperDiagnostics(
     float Cx, float Cy, int Waypoint, int WaypointCount, float Zoom, float FitZoom,

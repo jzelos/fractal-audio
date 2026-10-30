@@ -1,11 +1,11 @@
 using SDL2;
-using SDL_Demo.Audio;
-using SDL_Demo.Diagnostics;
-using SDL_Demo.Graphics;
-using SDL_Demo.Mapping;
+using FractalAudio.Audio;
+using FractalAudio.Diagnostics;
+using FractalAudio.Graphics;
+using FractalAudio.Mapping;
 using Silk.NET.OpenGL;
 
-namespace SDL_Demo;
+namespace FractalAudio;
 
 /// <summary>
 /// Owns the SDL window + GL context lifetime and the main loop (poll events, fixed-step update

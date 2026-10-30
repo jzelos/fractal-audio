@@ -1,6 +1,6 @@
 using NAudio.Wave;
 
-namespace SDL_Demo.Audio;
+namespace FractalAudio.Audio;
 
 /// <summary>
 /// Wraps <see cref="WasapiLoopbackCapture"/> against the default render endpoint, downmixes to
