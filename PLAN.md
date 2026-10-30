@@ -753,3 +753,8 @@ parametric curve". Concretely, for Tier 1:
   number of beats nearest 0.9s (at least 1, at most the beats between changes), so the morph
   starts and settles on grid beats; unlocked it stays 0.9s. Build clean; 15s smoke run clean
   (unlocked audio only).
+- 2026-10-30 [worker] Beat sync, palette fade: while locked, a palette crossfade lasts the whole
+  number of beats nearest 1.5s (at least 1, at most the beats between palette changes), so it
+  ends on a beat like the shape glide; unlocked it stays 1.5s. Build clean; 15s smoke run clean
+  (live audio never locked, conf 0.09-0.15). With this, every discrete change and the zoom punch
+  follow the grid while locked; what remains of Phase 9 is the human playtest on a locking track.

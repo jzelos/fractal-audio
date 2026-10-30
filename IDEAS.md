@@ -25,8 +25,9 @@ art found) or [speculative] (plausible, unverified for this codebase).
 > **Status:** all four items below implemented as PLAN.md Phase 9 (2026-10-21) — awaiting a second
 > playtest before moving to Done. Item (c) was then pulled forward too: `Audio/TempoTracker.cs`
 > (tempo + phase lock, scored against known-BPM tracks with `tools/TempoReplay`), and as of
-> 2026-10-30, while locked, palette fades and shape glides start on grid beats, glides last whole
-> beats, and the zoom punch is driven by beat phase so it peaks on the beat. Still needs a playtest
+> 2026-10-30, while locked, palette fades and shape glides start on grid beats, both last whole
+> beats, and the zoom punch is driven by beat phase so it peaks on the beat. Nothing code-side
+> is left on these four items. Still needs a playtest
 > on a track that locks.
 
 User ran the app with real music and reported: (1) a coloured background with a black silhouette in
@@ -296,3 +297,5 @@ unverified pending exactly this kind of check, so this is the expected next loop
   awaiting re-playtest (line numbers cited above refer to the pre-Phase-9 code).
 - 2026-10-30 [worker] Project renamed `SDL_Demo` -> `fractal-audio`. Tier 1 fix #4: discrete
   changes and the zoom punch now follow the tempo grid while locked (see PLAN.md change log).
+- 2026-10-30 [worker] Tier 1 fix #4: palette crossfades also last whole beats while locked —
+  the last off-grid discrete timing. Remaining step is the playtest.
