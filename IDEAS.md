@@ -304,3 +304,6 @@ unverified pending exactly this kind of check, so this is the expected next loop
   the last off-grid discrete timing. Remaining step is the playtest.
 - 2026-10-30 [worker] Tier 2: feedback buffer (constant warp, F toggle).
 - 2026-10-30 [worker] Tier 2: feedback warp driven by the mapper (beat pulse, band tilt).
+- 2026-10-30 [worker] Playtest 4 feedback: trails look good; wants something more colourful than
+  the black silhouette. Interior now coloured by an orbit trap (closest approach to the origin)
+  through the shifted, dimmed palette (`shaders/fractal.frag` INTERIOR_* constants).

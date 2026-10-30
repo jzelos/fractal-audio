@@ -22,6 +22,11 @@ uniform float u_paletteBlend;    // 0 = all "from", 1 = all "to"
 
 const float BAILOUT2 = 4.0; // |z|^2 > 4.0 standard escape-time bailout.
 
+// Interior (orbit-trap) colouring, tune-by-eye — edit the copy in bin/.../shaders while running.
+const float INTERIOR_SCALE = 1.6;       // palette cycles per unit of closest approach to the origin.
+const float INTERIOR_SHIFT = 0.5;       // half a palette away from the exterior, for contrast.
+const float INTERIOR_BRIGHTNESS = 0.65; // below the exterior, so the silhouette and trails still read.
+
 vec2 cmul(vec2 a, vec2 b)
 {
     return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
@@ -46,6 +51,7 @@ void main()
     float smoothIter = float(u_maxIter);
     vec2 finalZ = z;
     vec2 finalDz = dz;
+    float trap2 = dot(z, z); // closest squared approach of the orbit to the origin.
 
     for (int i = 0; i < u_maxIter; i++)
     {
@@ -55,6 +61,7 @@ void main()
         dz = nextDz;
 
         float mag2 = dot(z, z);
+        trap2 = min(trap2, mag2);
         if (mag2 > BAILOUT2)
         {
             // Smooth iteration count: n - log2(log2(|z|)) correction, standard escape-time coloring.
@@ -71,8 +78,12 @@ void main()
     vec3 color;
     if (!escaped)
     {
-        // Interior of the filled Julia set: flat dark color, not part of the audio-reactive LUT.
-        color = vec3(0.02, 0.02, 0.03);
+        // Interior of the filled Julia set: an orbit trap — how close the orbit came to the
+        // origin, through the same (audio-rotated, crossfading) palette, shifted and dimmed so
+        // the boundary still reads. Gives smooth bands that follow the shape of the set.
+        float t = fract(sqrt(trap2) * INTERIOR_SCALE + u_paletteOffset + INTERIOR_SHIFT);
+        color = mix(paletteRow(u_paletteFrom, t), paletteRow(u_paletteTo, t), u_paletteBlend);
+        color *= INTERIOR_BRIGHTNESS;
     }
     else
     {
