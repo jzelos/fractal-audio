@@ -8,7 +8,8 @@ namespace FractalAudio.Graphics;
 /// output (a slight zoom out from the centre plus a rotation), fades it, and keeps the brighter of
 /// it and the fresh frame. Bright boundary detail therefore leaves trails over the dark interior
 /// as the shape morphs. The composite alternates between two targets (ping-pong), and the result
-/// is drawn to the screen.
+/// is drawn to the screen. The warp comes from Mapping/AudioToFractalMapper (the one place audio
+/// becomes visual parameters).
 ///
 /// The fade is a fixed per-second rate, never audio-driven, and the composite is a max rather
 /// than a sum, so the image can't saturate to white. Targets are RGBA16F: with 8-bit channels a
@@ -16,10 +17,8 @@ namespace FractalAudio.Graphics;
 /// </summary>
 public sealed class FeedbackBuffer : IDisposable
 {
-    // Tune-by-eye starting points. Expressed per second so the look doesn't depend on frame rate.
+    // Tune-by-eye; per second so the look doesn't depend on frame rate.
     private const float TrailHalfLifeSeconds = 0.35f;
-    private const float ZoomPerSecond = 0.25f;     // trails expand outward by this fraction per second.
-    private const float RotationPerSecond = 0.15f; // radians.
 
     private readonly GL _gl;
     private readonly ShaderHotReloader _composite;
@@ -54,7 +53,7 @@ public sealed class FeedbackBuffer : IDisposable
 
     /// <summary>Composites the fresh frame over the warped, faded previous output and draws the
     /// result to the default framebuffer. Leaves texture unit 0 bound to the result.</summary>
-    public void CompositeAndPresent(FullscreenQuad quad, double dtSeconds)
+    public void CompositeAndPresent(FullscreenQuad quad, double dtSeconds, Mapping.FeedbackWarp warp)
     {
         int source = _output;
         if (Enabled)
@@ -71,8 +70,8 @@ public sealed class FeedbackBuffer : IDisposable
             composite.SetUniform1i("u_previous", 1);
             composite.SetUniform2f("u_resolution", _width, _height);
             composite.SetUniform1f("u_fade", MathF.Pow(0.5f, dt / TrailHalfLifeSeconds));
-            composite.SetUniform1f("u_zoom", 1f + (ZoomPerSecond * dt));
-            composite.SetUniform1f("u_rotation", RotationPerSecond * dt);
+            composite.SetUniform1f("u_zoom", 1f + (warp.ZoomPerSecond * dt));
+            composite.SetUniform1f("u_rotation", warp.RotationPerSecond * dt);
             quad.Draw();
 
             _output = target;

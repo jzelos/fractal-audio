@@ -97,8 +97,10 @@ public sealed class DiagnosticsPanel
         Add(string.Format(Inv, "Julia  c = {0:+0.000;-0.000} {1:+0.000;-0.000}i   waypoint {2}/{3}",
             m.Cx, m.Cy, m.Waypoint + 1, m.WaypointCount));
         Add($"Zoom   {m.Zoom:F2} (fit {m.FitZoom:F2})   palette {m.PaletteFrom}->{m.PaletteTo} blend {m.PaletteBlend:F2}");
+        Add(string.Format(Inv, "Trails zoom {0:F2}/s  rotate {1:+0.00;-0.00} rad/s",
+            mapper.Warp.ZoomPerSecond, mapper.Warp.RotationPerSecond));
 
-        Add($"Frame  {frameTimeSeconds * 1000:F1} ms      D: hide overlay   T/Space: tap", 140, 140, 140);
+        Add($"Frame  {frameTimeSeconds * 1000:F1} ms      D: hide overlay   T/Space: tap   F: trails", 140, 140, 140);
 
         return _lines;
     }

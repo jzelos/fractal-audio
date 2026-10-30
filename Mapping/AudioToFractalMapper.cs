@@ -3,6 +3,9 @@ using FractalAudio.Graphics;
 
 namespace FractalAudio.Mapping;
 
+/// <summary>Per-second warp applied to the feedback trails (see <see cref="FeedbackBuffer"/>).</summary>
+public readonly record struct FeedbackWarp(float ZoomPerSecond, float RotationPerSecond);
+
 public readonly record struct MapperDiagnostics(
     float Cx, float Cy, int Waypoint, int WaypointCount, float Zoom, float FitZoom,
     int PaletteFrom, int PaletteTo, float PaletteBlend);
@@ -17,7 +20,9 @@ public readonly record struct MapperDiagnostics(
 ///
 /// Continuous (every frame, smooth): bass+band perturbation of `c` around the current waypoint,
 /// palette phase rotation driven by RMS, and bass-driven zoom "breathing" below a fit zoom that
-/// keeps the silhouette inside a fixed screen border (see <see cref="JuliaBounds"/>).
+/// keeps the silhouette inside a fixed screen border (see <see cref="JuliaBounds"/>). Also the
+/// feedback trails' warp (<see cref="Warp"/>): they push outward with the beat pulse and swirl
+/// with the low-mid vs presence tilt. The trails' fade is deliberately not audio-driven.
 /// Discrete (edge-detected on the frame's monotonic counters, never on the one-tick bools — see
 /// <see cref="AudioFrame.OnsetCount"/>):
 ///   - beat (the tempo tracker's phase-locked grid beat, or the raw bass-only onset detector
@@ -88,6 +93,11 @@ public sealed class AudioToFractalMapper
     private const float BandAgcDecaySeconds = 5.0f;    // per-band running-max decay for normalisation.
     private const float BandAgcFloor = 5e-4f;          // stops the AGC amplifying near-silence to full scale.
     private const int MaxIter = 200;
+    // Feedback trail warp: a slow drift plus a push on the beat pulse; rotation follows the
+    // smoothed band tilt, so its direction changes with the mix.
+    private const float TrailZoomRestPerSecond = 0.15f;
+    private const float TrailZoomBeatPerSecond = 0.6f;
+    private const float TrailRotationPerSecond = 0.4f; // radians/s at full tilt.
 
     // Phase 8 robustness clamps/rate-limits (see PLAN.md "Float precision / clamping" and
     // "Robustness pass") — these guard against float32 cracking at extreme zoom, runaway
@@ -147,6 +157,9 @@ public sealed class AudioToFractalMapper
     /// <summary>Read-only snapshot of what the last <see cref="Apply"/> wrote, for the on-screen
     /// diagnostics overlay. Reading it never affects the mapping.</summary>
     public MapperDiagnostics Diagnostics { get; private set; }
+
+    /// <summary>The feedback trails' warp for this frame, from the last <see cref="Apply"/>.</summary>
+    public FeedbackWarp Warp { get; private set; } = new(TrailZoomRestPerSecond, 0f);
 
     /// <summary>AGC-normalised band levels (0..1) from the last <see cref="Apply"/>.</summary>
     public ReadOnlySpan<float> NormalizedBands => _normalizedBands;
@@ -309,6 +322,10 @@ public sealed class AudioToFractalMapper
         program.SetUniform1i("u_paletteFrom", _paletteFrom);
         program.SetUniform1i("u_paletteTo", _paletteTo);
         program.SetUniform1f("u_paletteBlend", paletteBlend);
+
+        Warp = new FeedbackWarp(
+            TrailZoomRestPerSecond + (TrailZoomBeatPerSecond * _beatPulse),
+            TrailRotationPerSecond * Math.Clamp(_smoothTilt, -1f, 1f));
 
         bands.CopyTo(_normalizedBands);
         Diagnostics = new MapperDiagnostics(

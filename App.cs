@@ -199,7 +199,7 @@ public sealed class App
         program.SetUniform1i("u_palette", 0);
 
         _quad.Draw();
-        _feedback.CompositeAndPresent(_quad, dt);
+        _feedback.CompositeAndPresent(_quad, dt, _mapper.Warp);
 
         // Diagnostics overlay: reads the frame + mapper state, never writes fractal uniforms.
         if (_overlayVisible && _overlay != null)
