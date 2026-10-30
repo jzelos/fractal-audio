@@ -269,11 +269,20 @@ fade rather than snap; waypoint jumps and zoom punches land on kicks, not hi-hat
 
 Recordings of these (FRACTAL_AUDIO_DUMP) can be scored with `tools/TempoReplay`; the dumps go
 in the git-ignored `recordings/` (they are tens of MB; file names in `recordings/README.md`).
-The earlier dumps were lost with an old session's scratch folder and need re-recording. Replay scores at `c9364e9`-era `HEAD` (exact = within 3%,
-readings every 0.5s after 10s): Diesel Power, Overdrive, Disco, Teardrop, Catch, PNG 99-100%;
-Hyperspeed 79% (misses are its half-time intro, corrected once the full beat enters); KLF 46%
-(riff-only intro reads 79 until the kick enters — Catch, KLF and PNG dumps predate the
-audio-time framing fix).
+The user re-recorded all of these plus 11 more (19 tracks, listed with BPMs in
+`recordings/README.md`) on 2026-10-30. Replay scores at `c26b577` (exact = within 3%, readings
+every 0.5s after 10s; 90% passes):
+- 97-100%: Catch, Disco, Overdrive, Teardrop, Diesel Power, Learning to Fly, Anvil, Reflektor,
+  Gosh, I Like the Way You Kiss Me.
+- KLF 87%, Black Sheep 78%, Hey Boy Hey Girl 78%, Research Chemicals 76% — not octave errors
+  (start-up and section changes; not investigated yet).
+- The Dark 72%: half-time intro and a half-time section read 73 — the onset signal has no
+  145 pulse there at all, so this is arguably right.
+- Acid Rain 65% (69 for ~20s mid-track), PNG 38%, Hyperspeed 13% (reads 188 = 5:4 for its
+  first 48s, then alternates 75/150) — not investigated yet.
+- Starburster 20%: reads 50 for 110s. Its estimates scatter across 50/98/196 (and 65/131), so
+  no single one persists long enough to displace the established 50; fixing it needs octave
+  choice across the whole family of related tempos, not the current consecutive-agreement switch.
 
 Re-check these live after any change to capture, analysis or `TempoTracker`. Status as of
 `842d612`, confirmed by the user on the overlay unless noted.
@@ -759,3 +768,15 @@ parametric curve". Concretely, for Tier 1:
   ends on a beat like the shape glide; unlocked it stays 1.5s. Build clean; 15s smoke run clean
   (live audio never locked, conf 0.09-0.15). With this, every discrete change and the zoom punch
   follow the grid while locked; what remains of Phase 9 is the human playtest on a locking track.
+- 2026-10-30 [worker] Octave errors on the re-recorded test set (19 tracks, user-supplied BPMs).
+  Measured per track, over 8s windows, the kick half-cycle ratio and the onset ACF at the half
+  period against the true tempo: the kick ratio alone overlaps (wrong doublings up to 0.85,
+  needed ones down to 0.73), the onset ACF ratio separates them. `TempoTracker`: ordinary
+  doubling needs kick ratio >= 0.7 (was 0.6) plus onset ACF at half the period >= 0.5x that at
+  the period; neither rule doubles past 160 BPM; undoing a doubling the rule made is as fast as
+  making it (was 10s once established), while an ACF-measured tempo keeps the slow switch.
+  Teardrop 7% -> 100%, Anvil 11% -> 98%, Overdrive 100% -> 97%, The Dark 81% -> 72% (half-time
+  intro now reads 73), rest unchanged; 12/19 pass (was 10). Tried and dropped: tracking the
+  octave as a separate decision from the ACF period (stickiness then held the slow octave of
+  the base period, breaking Hey Boy Hey Girl), and removing stickiness against the current
+  tempo's double (no effect on Starburster). App build clean; not re-checked live.
