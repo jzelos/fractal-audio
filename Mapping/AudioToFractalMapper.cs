@@ -23,7 +23,8 @@ public readonly record struct MapperDiagnostics(
 ///   - beat (the tempo tracker's phase-locked grid beat, or the raw bass-only onset detector
 ///     while unlocked): fires a decaying zoom punch, and — every N beats / a minimum hold —
 ///     glides to the next curated Julia-`c` waypoint along a loop of neighbouring points;
-///   - general onset: advances the palette, held for a minimum time and crossfaded, never snapped.
+///   - palette advance, crossfaded, never snapped: every M grid beats while the tempo is locked
+///     (always together with a shape change), else on a general onset after a minimum hold.
 ///
 /// Julia-`c` mapping: a curated-waypoint approach (see PLAN.md "Julia mapping") rather than
 /// IDEAS.md's literal unconstrained radius/angle mapping — bounds `c` to a perturbation radius
@@ -62,7 +63,7 @@ public sealed class AudioToFractalMapper
     private const float MinWaypointHoldSeconds = 1.5f; // beats inside this window punch the zoom but don't change shape.
     private const float PaletteRotationSpeed = 0.6f;   // palette-phase units/sec at Rms == 1.
     private const float PaletteFadeSeconds = 1.5f;     // palette crossfade duration.
-    private const float MinPaletteHoldSeconds = 6.0f;  // onsets inside this window don't change the palette.
+    private const float MinPaletteHoldSeconds = 6.0f;  // minimum time between palette changes (locked: rounded up to a power-of-two beat count).
     // Zoom is expressed relative to the "fit" zoom that puts the silhouette exactly at the
     // border: zoom = fit * (rest + depth*bass + punch*beatPulse), and rest + depth + punch == 1,
     // so even a loud bass hit plus a beat punch only reaches the border, never past it.
@@ -112,7 +113,8 @@ public sealed class AudioToFractalMapper
     private float _perturbY;
 
     private double _waypointChangeSeconds = -MinWaypointHoldSeconds;
-    private int _beatsSinceWaypoint;
+    private bool _wasLocked;
+    private long _gridBeats; // grid beats since the tempo last locked.
     private float _beatPulse;
     private float _beatPulseTarget;
     private float _fitZoom = 1f;
@@ -160,33 +162,46 @@ public sealed class AudioToFractalMapper
         _lastBeatCount = frame.BeatCount;
         _lastOnsetCount = frame.OnsetCount;
 
+        bool locked = frame.TempoLocked && frame.TempoBpm > 0f;
+        if (locked != _wasLocked)
+        {
+            _wasLocked = locked;
+            _gridBeats = 0;
+        }
+
         if (beat)
         {
             _beatPulseTarget = 1f;
-            _beatsSinceWaypoint++;
 
-            // Locked to a tempo: change shape every N grid beats, N the smallest power of two
-            // spanning the hold time, so changes fall on the musical grid. Unlocked (raw kick
-            // detector fallback): a plain time hold.
-            bool due = frame.TempoLocked && frame.TempoBpm > 0f
-                ? _beatsSinceWaypoint >= BeatsPerWaypoint(frame.TempoBpm)
-                : nowSeconds - _waypointChangeSeconds >= MinWaypointHoldSeconds;
-
-            if (due)
+            // Locked to a tempo: count grid beats and change shape every N of them and the
+            // palette every M (each the smallest power of two spanning its hold time), so both
+            // fall on the musical grid — and since M is a multiple of N, every palette change
+            // lands together with a shape change. Unlocked (raw kick detector fallback): the
+            // shape uses a plain time hold and the palette follows onsets, below.
+            if (locked)
             {
-                _beatsSinceWaypoint = 0;
-                _glideFromC = _baseC;
-                _targetWaypointIndex = (_targetWaypointIndex + 1) % Waypoints.Length;
-                _glideStartSeconds = nowSeconds;
-                _waypointChangeSeconds = nowSeconds;
+                _gridBeats++;
+                if (_gridBeats % BeatsSpanning(frame.TempoBpm, MinWaypointHoldSeconds) == 0)
+                {
+                    AdvanceWaypoint(nowSeconds);
+                }
+                // The fade check only matters when the tempo has just locked after an
+                // onset-driven change: never cut a crossfade short.
+                if (_gridBeats % BeatsSpanning(frame.TempoBpm, MinPaletteHoldSeconds) == 0
+                    && nowSeconds - _paletteChangeSeconds >= PaletteFadeSeconds)
+                {
+                    AdvancePalette(nowSeconds);
+                }
+            }
+            else if (nowSeconds - _waypointChangeSeconds >= MinWaypointHoldSeconds)
+            {
+                AdvanceWaypoint(nowSeconds);
             }
         }
 
-        if (onset && nowSeconds - _paletteChangeSeconds >= MinPaletteHoldSeconds)
+        if (!locked && onset && nowSeconds - _paletteChangeSeconds >= MinPaletteHoldSeconds)
         {
-            _paletteFrom = _paletteTo;
-            _paletteTo = (_paletteTo + 1) % PaletteCount;
-            _paletteChangeSeconds = nowSeconds;
+            AdvancePalette(nowSeconds);
         }
 
         // --- Normalise band envelopes (raw FFT magnitudes sit far below 1) with a decaying
@@ -282,11 +297,28 @@ public sealed class AudioToFractalMapper
             _paletteFrom, _paletteTo, paletteBlend);
     }
 
-    private static int BeatsPerWaypoint(float bpm)
+    private void AdvanceWaypoint(double nowSeconds)
+    {
+        _glideFromC = _baseC;
+        _targetWaypointIndex = (_targetWaypointIndex + 1) % Waypoints.Length;
+        _glideStartSeconds = nowSeconds;
+        _waypointChangeSeconds = nowSeconds;
+    }
+
+    private void AdvancePalette(double nowSeconds)
+    {
+        _paletteFrom = _paletteTo;
+        _paletteTo = (_paletteTo + 1) % PaletteCount;
+        _paletteChangeSeconds = nowSeconds;
+    }
+
+    /// <summary>The smallest power-of-two number of beats at <paramref name="bpm"/> that lasts
+    /// at least <paramref name="seconds"/> (capped at 32).</summary>
+    private static int BeatsSpanning(float bpm, float seconds)
     {
         float beatSeconds = 60f / bpm;
         int n = 1;
-        while (n < 16 && n * beatSeconds < MinWaypointHoldSeconds)
+        while (n < 32 && n * beatSeconds < seconds)
         {
             n *= 2;
         }

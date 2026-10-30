@@ -730,3 +730,12 @@ parametric curve". Concretely, for Tier 1:
   0.49s and "61" was never ground truth, so possibly a fix; unverified. Live check of Overdrive
   missed (track had changed); a live run on an unknown-BPM track stayed unlocked at conf
   0.10-0.18 ("searching", raw-detector beats), as designed.
+- 2026-10-30 [worker] Renamed the project `SDL_Demo` -> `fractal-audio` (`FractalAudio.csproj`/
+  `.sln`, namespace `FractalAudio`, `fractal-audio.exe`, dump env var `FRACTAL_AUDIO_DUMP`).
+- 2026-10-30 [worker] Beat sync, palette: while the tempo is locked, palette changes now fall on
+  the grid — every M grid beats (smallest power of two spanning the 6s hold), counted from the
+  moment of lock, as are shape changes (every N beats, N | M), so each palette crossfade starts
+  together with a waypoint glide on a beat. Previously palettes followed general onsets (hi-hats,
+  vocals) after a 6s hold, i.e. at a time unrelated to the beat. Unlocked behaviour unchanged.
+  Build clean; 20s smoke run against live system audio (tempo unlocked, conf ~0.15) clean. Locked
+  behaviour NOT verified live.
