@@ -778,7 +778,7 @@ parametric curve". Concretely, for Tier 1:
   the period; neither rule doubles past 160 BPM; undoing a doubling the rule made is as fast as
   making it (was 10s once established), while an ACF-measured tempo keeps the slow switch.
   Teardrop 7% -> 100%, Anvil 11% -> 98%, Overdrive 100% -> 97%, The Dark 81% -> 72% (half-time
-  intro now reads 73), rest unchanged; 12/19 pass (was 10). Tried and dropped: tracking the
+  intro now reads 73), rest unchanged; 10/19 pass (was 8; first logged here as "12/19 (was 10)", a miscount — also in the c26b577 commit message). Tried and dropped: tracking the
   octave as a separate decision from the ACF period (stickiness then held the slow octave of
   the base period, breaking Hey Boy Hey Girl), and removing stickiness against the current
   tempo's double (no effect on Starburster). App build clean; not re-checked live.
