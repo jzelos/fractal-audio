@@ -82,3 +82,7 @@ tool exits non-zero if any dump scores below 90%.
 
 C# / .NET 8, [Sayers.SDL2.Core](https://www.nuget.org/packages/Sayers.SDL2.Core) (SDL2),
 [Silk.NET.OpenGL](https://github.com/dotnet/Silk.NET), [NAudio](https://github.com/naudio/NAudio).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
