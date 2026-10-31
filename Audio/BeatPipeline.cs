@@ -41,6 +41,10 @@ public sealed class BeatPipeline
 
     public TempoTracker Tempo { get; } = new(FrameRate, BeatLeadSeconds);
 
+    /// <summary>The two values the last <see cref="Process"/> fed <see cref="Tempo"/> — all the
+    /// tempo tracker sees of the audio. tools/TempoReplay exports them as a signals file.</summary>
+    public (float Onset, float BassFlux) LastTempoInput { get; private set; }
+
     /// <summary>
     /// Processes one frame. <paramref name="bandStart"/>/<paramref name="bandEnd"/> come from
     /// <see cref="BandLayout.Compute"/>. Returns the beat to act on (the tempo grid's beat while
@@ -54,6 +58,7 @@ public sealed class BeatPipeline
         float bassFlux = _kickDetector.RawFlux;
 
         float onset = OnsetStrength(magnitudes, bandStart[0], bandEnd[BandLayout.BandCount - 1]);
+        LastTempoInput = (onset, bassFlux);
         bool gridBeat = Tempo.Process(onset, bassFlux);
         return (Tempo.Locked ? gridBeat : rawKick, rawKick);
     }
