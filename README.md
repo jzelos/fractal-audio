@@ -40,25 +40,18 @@ reported to the console and the last working version keeps rendering.
 The on-screen overlay (toggle with **D**) shows the tempo estimate, lock state and confidence;
 tap **T** or **Space** along with the music to compare your tempo with the tracker's.
 
-To record what the beat tracker sees, set `FRACTAL_AUDIO_DUMP` to a file path before running:
+`tools/TempoReplay` scores the tracker's tempo against a committed test set of 19 tracks with
+known BPMs — the two onset signals per frame the tracker reads, not audio — so tracker changes
+can be checked without replaying any music:
 
 ```powershell
-$env:FRACTAL_AUDIO_DUMP = "recordings\catch.csv"; dotnet run --project FractalAudio.csproj
+dotnet run --project tools/TempoReplay -- recordings/signals
 ```
 
-`tools/TempoReplay` feeds such dumps through the app's own beat pipeline and scores the tempo
-against known BPMs, so tracker changes can be checked against recordings without replaying
-the music:
-
-```powershell
-dotnet run --project tools/TempoReplay -- recordings\catch.csv=130 recordings\disco.csv=97 --timeline
-```
-
-Keep dumps in `recordings/` (git-ignored). Its README lists the known-BPM test tracks, the file
-names to record them under, and a command that scores them all.
-
-`--trace=FROM-TO` prints each estimate's decision steps within that time range (seconds). The
-tool exits non-zero if any dump scores below 90%.
+`--timeline` shows each track's tempo over time, `--trace=FROM-TO` the tracker's decision steps
+within that range (seconds); the tool exits non-zero if any track scores below 90%. To record
+your own tracks (full spectrum dumps, which stay local) and add them to the set, see
+[recordings/README.md](recordings/README.md).
 
 ## Layout
 
@@ -71,7 +64,7 @@ tool exits non-zero if any dump scores below 90%.
 | `shaders/` | `quad.vert`, `fractal.frag` (Julia escape-time with smooth colouring), `feedback.frag` (motion trails), `present.frag` |
 | `Diagnostics/` | On-screen overlay text and tap tempo |
 | `tools/TempoReplay/` | Replays tempo dumps through the beat pipeline (see Tempo diagnostics) |
-| `recordings/` | Git-ignored tempo dumps of the known-BPM test tracks (see its README) |
+| `recordings/` | Tempo test set: committed onset signals (`signals/`), local spectrum dumps (see its README) |
 
 ## Docs
 

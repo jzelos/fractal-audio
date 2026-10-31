@@ -267,8 +267,10 @@ fade rather than snap; waypoint jumps and zoom punches land on kicks, not hi-hat
 
 ## Tempo test tracks (user-confirmed BPM)
 
-Recordings of these (FRACTAL_AUDIO_DUMP) can be scored with `tools/TempoReplay`; the dumps go
-in the git-ignored `recordings/` (they are tens of MB; file names in `recordings/README.md`).
+Recordings of these can be scored with `tools/TempoReplay`. The FRACTAL_AUDIO_DUMP spectrum
+dumps stay local (tens of MB, and resynthesisable audio — not publishable); the tempo-signal
+files exported from them are committed in `recordings/signals/` and replay to identical scores
+(`dotnet run --project tools/TempoReplay -- recordings/signals`).
 The user re-recorded all of these plus 11 more (19 tracks, listed with BPMs in
 `recordings/README.md`) on 2026-10-30. Replay scores at `c26b577` (exact = within 3%, readings
 every 0.5s after 10s; 90% passes):
@@ -780,3 +782,8 @@ parametric curve". Concretely, for Tier 1:
   octave as a separate decision from the ACF period (stickiness then held the slow octave of
   the base period, breaking Hey Boy Hey Girl), and removing stickiness against the current
   tempo's double (no effect on Starburster). App build clean; not re-checked live.
+- 2026-10-31 [worker] Test set made publishable: `tools/TempoReplay --export=DIR` writes each
+  spectrum dump's tracker input (onset strength, bass flux per frame; true BPM in the header)
+  as a `.tsig`; replay accepts `.tsig` files and directories. Committed the 19 tracks to
+  `recordings/signals/` (2.4 MB). Scores from the signals match the dumps exactly on all 19.
+  The dumps themselves stay git-ignored (resynthesisable — copyright).

@@ -19,6 +19,8 @@ buildout/
 Thumbs.db
 .DS_Store
 
-# Tempo dumps (tens of MB each) — see recordings/README.md
+# Spectrum dumps (tens of MB, and close enough to the audio to resynthesise) stay local; the
+# derived tempo-signal files are committed — see recordings/README.md
 recordings/*
 !recordings/README.md
+!recordings/signals/
